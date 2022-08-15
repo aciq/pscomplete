@@ -29,3 +29,11 @@ module Graphics =
     
     let boxBottom length content =
         $"╚══ {content} ".PadRight(length+1,'═') + "╝"
+        
+        
+module PsArgument =
+    let getText (v:string) = 
+        let argtype = v
+        let startidx = argtype.IndexOf(": [")
+        if startidx = -1 then "" else
+        argtype.Substring(startidx + ": [".Length) |> (fun f -> f[..f.Length-2])

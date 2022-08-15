@@ -3,29 +3,23 @@
 open System.Management.Automation
 open Helpers
 open System.Management.Automation.Host
-open System.Reflection
 open System
-open System.Linq
 open System.Text.RegularExpressions
 
 let bufferCell char = BufferCell(
     Character = char,
     BufferCellType = BufferCellType.Complete
-)    
+)
 
-
-
-
-
-
-    
-
-
-let getArgumentText (v:string) = 
-    let argtype = v
-    let startidx = argtype.IndexOf(": [")
-    if startidx = -1 then "" else
-    argtype.Substring(startidx + ": [".Length) |> (fun f -> f[..f.Length-2])
+type ExitKey =
+    | None = 0
+    | Tab = 1
+    | Enter = 2
+    | Escape = 3
+    | Error = 4
+    // | Period = 4
+    // | Slash = 5  
+    // | Backslash = 6  
 
 [<CLIMutable>]
 type CompleteOutput = 
@@ -33,7 +27,7 @@ type CompleteOutput =
         ArgumentType : string
         CompletionText : string
         ResultType : CompletionResultType
-        Continue : bool
+        ExitKey : ExitKey
     }
 
 [<OutputType(typeof<CompleteOutput>)>]
@@ -55,7 +49,9 @@ type ConfCmdlet() =
     member val FrameTop = Unchecked.defaultof<Coordinates> with get,set
     member val Index = 0 with get,set
     member val ScrollY = 0 with get,set
+    member val Buffer = Unchecked.defaultof<BufferCell [,]> with get,set
     member val FilteredContent = [||] with get,set
+    member val VisibleContent = [||] with get,set
 
     member x.SetCursorPos (ui:PSHostRawUserInterface) yroot =
       ui.CursorPosition <- Coordinates(X=0,Y=yroot+2+x.Index)
@@ -66,18 +62,20 @@ type ConfCmdlet() =
         for i = 0 to min (current.Length - 1) xmax do
             buffer[y,i].Character <- current[i]
 
-    member x.ColorBlock (ui:PSHostRawUserInterface) yroot (block: BufferCell[,]) =
+    member x.ColorBlockInside (ui:PSHostRawUserInterface) yroot (block: BufferCell[,]) =
+        let xstart = 1
+        let ystart = 1
         let longest = x.LongestCompleteText()
         ui.BackgroundColor <- ConsoleColor.Black
-        let colorArray = block[0..x.FilteredContent.Length,0..longest.Length]
-        for i = 0 to x.FilteredContent.Length do
-            ui.SetBufferContents(Coordinates(0,yroot+i),colorArray[i..i,0..longest.Length+10])
+        let colorArray = block[xstart..x.VisibleContent.Length,ystart..longest.Length]
+        for i = 0 to x.VisibleContent.Length do
+            ui.SetBufferContents(Coordinates(xstart,yroot+i+ystart),colorArray[i..i,0..longest.Length+10])
         ()
         
-    member x.MoveAndRender (ui:PSHostRawUserInterface) (coords:Coordinates) (start:BufferCell [,]) (adjustY) = 
+    member x.MoveAndRender (ui:PSHostRawUserInterface) (coords:Coordinates) (start:BufferCell [,]) adjustY = 
         x.ClearScreen(start)
         x.FilterContent()
-        x.SetInputs (adjustY)
+        x.UpdateIndex adjustY
         match x.FilteredContent.Length with 
         | 0 -> 
             x.DrawEmptyFilter ui start
@@ -85,18 +83,16 @@ type ConfCmdlet() =
         | _ -> 
         x.DrawQueryBox ui start
         let widest : string = x.LongestCompleteText()
-        let arr2 : BufferCell[,] = start[0..widest.Length,*]
-        ui.SetBufferContents(coords,arr2)
-        x.ColorBlock ui coords.Y arr2
-        x.SetCursorPos ui (coords.Y) 
+        let innerBox : BufferCell[,] = start[0..widest.Length,*]
+        ui.SetBufferContents(coords,innerBox)
+        x.ColorBlockInside ui coords.Y innerBox
+        x.SetCursorPos ui coords.Y 
         x.ColorSelectedLine ui coords.Y 
 
         
-    member x.DrawEmptyFilter (ui:PSHostRawUserInterface) (buffer:BufferCell[,])  = 
-        let st1 = String.replicate 2 $"%c{Chars.horizontalDouble}"
-        let filtertext =
-            $"{Chars.topLeftDouble}{st1} [{x.FilterText}] ".PadRight(5,Chars.horizontalDouble) + $"{Chars.topRightDouble}"
-        x.WriteBufferLine 0 buffer filtertext
+    member x.DrawEmptyFilter (_:PSHostRawUserInterface) (buffer:BufferCell[,])  = 
+        let top = Graphics.boxTop 5 $"{x.CommandString}[{x.FilterText}]" 
+        x.WriteBufferLine 0 buffer top
 
 
     member x.ColorSelectedLine (ui:PSHostRawUserInterface) yroot =
@@ -110,33 +106,32 @@ type ConfCmdlet() =
         ui.BackgroundColor <- ConsoleColor.Black
         ()
 
-    member x.SetInputs (adjust:int) = 
-        
+    member x.UpdateIndex (adjust:int) = 
         match x.Index + adjust with 
         | -1 -> 
             if x.ScrollY > 0 then
                 x.ScrollY <- x.ScrollY - 1
                 x.FilterContent()
-        | n when n >=(x.FilteredContent.Length ) -> 
+        | n when n >= x.FilteredContent.Length -> 
             if n + x.ScrollY < x.Content.Count then
                 x.ScrollY <- x.ScrollY + 1
                 x.FilterContent()
         | _ -> x.Index <- (x.Index + adjust)
 
 
-    member x.DrawQueryBox (ui:PSHostRawUserInterface) (buffer:BufferCell[,])  = 
+    member x.DrawQueryBox (_:PSHostRawUserInterface) (buffer:BufferCell[,])  = 
         if x.FilteredContent.Length = 0 then () else
         let comptexts = x.CompleteTexts()
         let longest : string = x.LongestCompleteText()
         let filtertext =
             Graphics.boxTop longest.Length $"{x.CommandString}[{x.FilterText}]" 
         x.WriteBufferLine 0 buffer filtertext
-        for y = 0 to x.FilteredContent.Length - 1 do
+        for y = 0 to x.VisibleContent.Length - 1 do
             Graphics.boxCenter longest.Length comptexts[y]
             |> x.WriteBufferLine (1+y) buffer 
         let bottomcontent = $"{x.Index + x.ScrollY + 1} of {x.FilteredContent.Length}"
         let filtertext = Graphics.boxBottom longest.Length bottomcontent
-        x.WriteBufferLine (x.FilteredContent.Length+1) buffer filtertext
+        x.WriteBufferLine (x.VisibleContent.Length+1) buffer filtertext
         
     member x.LongestCompleteText() : string =
         x.CompleteTexts() |> Array.maxBy (fun (f:string) -> f.Length)
@@ -161,16 +156,23 @@ type ConfCmdlet() =
 
     member x.FilterContent() = 
         x.Content
-        |> Seq.where (fun f -> f.CompletionText.Contains(x.FilterText,StringComparison.OrdinalIgnoreCase) )
+        |> Seq.where (fun f ->
+            try Regex.IsMatch(f.ListItemText,$"^{x.CommandString}.*{x.FilterText}",RegexOptions.IgnoreCase)
+            with e-> false
+        )
         |> Seq.toArray
         |> (fun f -> 
-            if f.Length > 0 then 
+            if f.Length > 0 then
                 f |> Seq.skip x.ScrollY 
             else f 
         )
-        |> Seq.truncate (x.FrameH - 3)
         |> Seq.toArray
-        |> (fun f -> x.FilteredContent <- f)
+        |> (fun f ->
+            x.FilteredContent <- f
+            x.VisibleContent <-
+                f |> Seq.truncate (x.FrameH - 3) |> Seq.toArray
+        )
+        
 
     member x.ClearScreen(buffer:BufferCell[,]) =
         x.Host.UI.RawUI.BackgroundColor <- -1 |> enum<ConsoleColor>
@@ -180,78 +182,74 @@ type ConfCmdlet() =
 
     override this.BeginProcessing() = this.WriteVerbose "Begin!"
 
+    
+    member this.ExitWithWarning(message: string) =
+        this.WriteWarning("\n"+message)
     override this.ProcessRecord() =
         try 
             this.FilterContent()
             if this.Content.Count = 0 then ()
-            // if one item then return and continue
             if this.Content.Count = 1 then 
                 this.WriteObject  
                     {
                         CompletionText = this.Content[0].CompletionText
-                        ArgumentType = 
-                            try this.CompleteTexts()[0] |> getArgumentText
-                            with e -> ""
+                        ArgumentType = "" // argument type was never queried
                         ResultType = this.Content[0].ResultType
-                        Continue = true
+                        ExitKey = ExitKey.None
                     }
             else
-
             let ui = this.Host.UI.RawUI
             this.FrameTop <- Coordinates(0,ui.CursorPosition.Y + 1 - ui.WindowPosition.Y)
-            this.FrameH <- ui.WindowSize.Height - ui.CursorPosition.Y - 3
+            this.FrameH <- ui.WindowSize.Height - ui.CursorPosition.Y - 1 
             this.FrameW <- ui.WindowSize.Width
-
-            if this.FrameH < 0 then () else
-            if this.FrameW < 0 then () else
             
-            let buf charray = 
-                ui.NewBufferCellArray( Size(this.FrameW,this.FrameH), bufferCell charray)
-
-            let start = buf ' '
-            this.FilterContent()
-            this.DrawQueryBox ui start
-            ui.SetBufferContents(this.FrameTop,start) // 2d array
+            if this.FrameH < 1 || this.FrameW < 1 then 
+                this.ExitWithWarning("Window too small to draw completion list, please clear the buffer")
+            else
             
+            let init() =
+                this.Buffer <- ui.NewBufferCellArray(Size(this.FrameW,this.FrameH), bufferCell ' ')
+                this.FilterContent()
+                this.DrawQueryBox ui this.Buffer
+                ui.SetBufferContents(Coordinates(0,ui.CursorPosition.Y + 1 - ui.WindowPosition.Y),this.Buffer) 
+                
+            init()
+            
+                
             let readkeyopts = 
                 ReadKeyOptions.NoEcho 
                 ||| ReadKeyOptions.AllowCtrlC
                 ||| ReadKeyOptions.IncludeKeyDown
 
-            let movepos (by:int) = this.MoveAndRender ui this.FrameTop start by    
+            let movepos (by:int) = this.MoveAndRender ui this.FrameTop this.Buffer by    
             movepos 0      
-
             
-
-            
+            let getCompletionAndExit exitKey =
+                try 
+                    if this.VisibleContent.Length <= this.Index then ()
+                    this.ClearScreen(this.Buffer) 
+                    {
+                        CompletionText = this.VisibleContent[this.Index].CompletionText
+                        ArgumentType = this.CompleteTexts()[this.Index] |> PsArgument.getText
+                        ResultType = this.VisibleContent[this.Index].ResultType
+                        ExitKey = exitKey
+                    }
+                    |> this.WriteObject
+                with e -> ()
 
             let rec loop() = 
                 let c = ui.ReadKey(options=readkeyopts)
-                
                 match c.VirtualKeyCode |> enum<ConsoleKey> with 
-                | ConsoleKey.Tab ->
-                    let argtype = this.CompleteTexts()[this.Index] |> getArgumentText
-                    {
-                        CompletionText = this.FilteredContent[this.Index].CompletionText
-                        ArgumentType = argtype 
-                        ResultType = this.FilteredContent[this.Index].ResultType
-                        Continue = true
-                    }
-                    |> this.WriteObject
-                    this.ClearScreen(start) |> ignore
-                | ConsoleKey.Enter -> 
-                    {
-                        CompletionText = this.FilteredContent[this.Index].CompletionText
-                        ArgumentType = this.CompleteTexts()[this.Index] |> getArgumentText
-                        Continue = false
-                        ResultType = this.FilteredContent[this.Index].ResultType
-                    }
-                    |> this.WriteObject
-                    this.ClearScreen(start) 
-                | ConsoleKey.Escape -> this.ClearScreen(start) 
-                | ConsoleKey.UpArrow -> movepos -1  ;(*up arrow*) loop()
-                | ConsoleKey.DownArrow -> movepos +1 ;(*down arrow*) loop()
-                | ConsoleKey.OemPeriod -> (*dot*) loop()
+                | ConsoleKey.Tab -> getCompletionAndExit ExitKey.Tab 
+                | ConsoleKey.Enter -> getCompletionAndExit ExitKey.Enter
+                | ConsoleKey.Escape -> getCompletionAndExit ExitKey.Escape                      
+                | ConsoleKey.LeftArrow -> loop()                      
+                | ConsoleKey.RightArrow -> loop()                      
+                | ConsoleKey.UpArrow -> movepos -1; loop()
+                | ConsoleKey.DownArrow -> movepos +1 ; loop()
+                // | ConsoleKey.OemPeriod -> getCompletionAndExit ExitKey.Period 
+                // | ConsoleKey.Oem2 -> getCompletionAndExit ExitKey.Slash // forward-slash 
+                // | ConsoleKey.Oem5 -> getCompletionAndExit ExitKey.Backslash // backslash 
                 | ConsoleKey.Backspace -> 
                     this.Index <- 0
                     this.ScrollY <- 0
@@ -274,8 +272,8 @@ type ConfCmdlet() =
             {
                 CompletionText = e.Message+"\n"+e.StackTrace
                 ArgumentType = ""
-                Continue = false
-                ResultType = this.Content[0].ResultType
+                ExitKey = ExitKey.None
+                ResultType = CompletionResultType.Text
             }
             |> this.WriteObject
             
