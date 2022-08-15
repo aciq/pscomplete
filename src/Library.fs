@@ -8,13 +8,6 @@ open System
 open System.Linq
 open System.Text.RegularExpressions
 
-type ConfTypes =
-    | NemoActions = 0 
-    | NemoAccels = 1
-
-
-type t = ValidateEnumeratedArgumentsAttribute
-
 let bufferCell char = BufferCell(
     Character = char,
     BufferCellType = BufferCellType.Complete
@@ -23,75 +16,10 @@ let bufferCell char = BufferCell(
 
 
 
-        
 
 
-
-
-
-let topLeftDouble : char = char 9556
-let verticalDouble = char 9553
-let horisontalDouble = char 9552
-let topRightDouble = char 9559
-let bottomLeftDouble = char 9562
-let bottomRightDouble = char 9562
-
-
-let drawquery (cmdlet:ConfCmdlet) (ui:PSHostRawUserInterface) (buffer:BufferCell[,])  = 
-    let _ : ResizeArray<_> = cmdlet.Content
-    let truncated : CompletionResult[] = cmdlet.FilteredContent
-    if truncated.Length = 0 then ui.WindowTitle <- $"empty" else
-
-    let comptexts = cmdlet.CompleteTexts()
-    let longest : string = cmdlet.LongestCompleteText()
-    let st1 = String.replicate 2 $"%c{horisontalDouble}"
-    let filtertext =
-        $"{topLeftDouble}{st1} [{cmdlet.FilterText}] ".PadRight(longest.Length+1,horisontalDouble) + $"{topRightDouble}"
-    writeBufferLine cmdlet 0 buffer filtertext
-    for y = 0 to truncated.Length - 1 do
-        let tt = $"{verticalDouble}{comptexts[y]}".PadRight(longest.Length+1,' ') + $"{verticalDouble}"
-        writeBufferLine cmdlet (1+y) buffer tt //2+
-    match cmdlet.Content.Count, comptexts.Count() with 
-    | a,b when a > b -> if (cmdlet.FrameH + cmdlet.ScrollY > a + 2) then true else false
-    | a,b -> if (cmdlet.FrameH + cmdlet.ScrollY >= b) then true else false
-    |> function 
-        | true -> 
-            let st1 = String.replicate 2 $"%c{horisontalDouble}"
-            let filtertext =
-                $"{bottomLeftDouble}{st1}     ".PadRight(longest.Length+1,horisontalDouble) + $"{bottomRightDouble}"
-            writeBufferLine cmdlet (comptexts.Count()+1) buffer filtertext
-        | false -> 
-            writeBufferLine cmdlet (comptexts.Count()+1) buffer (String.replicate (longest.Length+1) " " )
-
-
-
-let drawemptyfilter (cmdlet:ConfCmdlet) (ui:PSHostRawUserInterface) (buffer:BufferCell[,])  = 
-    let st1 = String.replicate 2 $"%c{horisontalDouble}"
-    let filtertext =
-        $"{topLeftDouble}{st1} [{cmdlet.FilterText}] ".PadRight(5,horisontalDouble) + $"{topRightDouble}"
-    writeBufferLine cmdlet 0 buffer filtertext
     
 
-let movePosition (cmdlet:ConfCmdlet) (ui:PSHostRawUserInterface) (coords:Coordinates) (start:BufferCell [,]) (adjustY) = 
-    let _ : ResizeArray<_> = cmdlet.Content
-    let _ : _[] = cmdlet.FilteredContent
-    cmdlet.ClearScreen(start)
-    cmdlet.FilterContent()
-    setInputs cmdlet (adjustY)
-    ui.WindowTitle <- $"selection {cmdlet.Index+1 + cmdlet.ScrollY} of {cmdlet.Content.Count}"
-    match cmdlet.FilteredContent.Length with 
-    | 0 -> 
-        drawemptyfilter cmdlet ui start
-        ui.SetBufferContents(coords,start)
-    | _ -> 
-    
-    drawquery cmdlet ui start
-    let widest : string = cmdlet.LongestCompleteText()
-    let arr2 : BufferCell[,] = start[0..widest.Length,*]
-    ui.SetBufferContents(coords,arr2)
-    colorBlock cmdlet ui coords.Y arr2
-    setcursorPos cmdlet ui (coords.Y) 
-    colorSelectedLine cmdlet ui coords.Y 
 
 let getArgumentText (v:string) = 
     let argtype = v
@@ -109,13 +37,17 @@ type CompleteOutput =
     }
 
 [<OutputType(typeof<CompleteOutput>)>]
-[<Cmdlet("q", "Conf")>]
+[<Cmdlet(VerbsLifecycle.Invoke, "PsComplete")>]
 type ConfCmdlet() =
     inherit PSCmdlet()
 
     [<Parameter(Position = 0, ValueFromPipelineByPropertyName = true)>]
-
     member val Content = ResizeArray<CompletionResult>() with get,set
+    [<Parameter>]
+    member val CommandString = "" with get,set
+    [<Parameter>]
+    member val CommandCursorPosition = 0 with get,set
+    
     member val FilterText = "" with get,set
     member val CleanBufferConfig = bool with get,set
     member val FrameH = 0 with get,set
@@ -125,10 +57,8 @@ type ConfCmdlet() =
     member val ScrollY = 0 with get,set
     member val FilteredContent = [||] with get,set
 
-
     member x.SetCursorPos (ui:PSHostRawUserInterface) yroot =
       ui.CursorPosition <- Coordinates(X=0,Y=yroot+2+x.Index)
-
 
     member x.WriteBufferLine (y:int) (buffer:BufferCell[,]) (current:string) =
         let xmax = buffer.GetLength(1) - 1
@@ -137,13 +67,37 @@ type ConfCmdlet() =
             buffer[y,i].Character <- current[i]
 
     member x.ColorBlock (ui:PSHostRawUserInterface) yroot (block: BufferCell[,]) =
-        let _ : CompletionResult[] = x.FilteredContent
         let longest = x.LongestCompleteText()
         ui.BackgroundColor <- ConsoleColor.Black
         let colorArray = block[0..x.FilteredContent.Length,0..longest.Length]
         for i = 0 to x.FilteredContent.Length do
             ui.SetBufferContents(Coordinates(0,yroot+i),colorArray[i..i,0..longest.Length+10])
         ()
+        
+    member x.MoveAndRender (ui:PSHostRawUserInterface) (coords:Coordinates) (start:BufferCell [,]) (adjustY) = 
+        x.ClearScreen(start)
+        x.FilterContent()
+        x.SetInputs (adjustY)
+        match x.FilteredContent.Length with 
+        | 0 -> 
+            x.DrawEmptyFilter ui start
+            ui.SetBufferContents(coords,start)
+        | _ -> 
+        x.DrawQueryBox ui start
+        let widest : string = x.LongestCompleteText()
+        let arr2 : BufferCell[,] = start[0..widest.Length,*]
+        ui.SetBufferContents(coords,arr2)
+        x.ColorBlock ui coords.Y arr2
+        x.SetCursorPos ui (coords.Y) 
+        x.ColorSelectedLine ui coords.Y 
+
+        
+    member x.DrawEmptyFilter (ui:PSHostRawUserInterface) (buffer:BufferCell[,])  = 
+        let st1 = String.replicate 2 $"%c{Chars.horizontalDouble}"
+        let filtertext =
+            $"{Chars.topLeftDouble}{st1} [{x.FilterText}] ".PadRight(5,Chars.horizontalDouble) + $"{Chars.topRightDouble}"
+        x.WriteBufferLine 0 buffer filtertext
+
 
     member x.ColorSelectedLine (ui:PSHostRawUserInterface) yroot =
         let _ : CompletionResult[] = x.FilteredContent
@@ -170,7 +124,20 @@ type ConfCmdlet() =
         | _ -> x.Index <- (x.Index + adjust)
 
 
-
+    member x.DrawQueryBox (ui:PSHostRawUserInterface) (buffer:BufferCell[,])  = 
+        if x.FilteredContent.Length = 0 then () else
+        let comptexts = x.CompleteTexts()
+        let longest : string = x.LongestCompleteText()
+        let filtertext =
+            Graphics.boxTop longest.Length $"{x.CommandString}[{x.FilterText}]" 
+        x.WriteBufferLine 0 buffer filtertext
+        for y = 0 to x.FilteredContent.Length - 1 do
+            Graphics.boxCenter longest.Length comptexts[y]
+            |> x.WriteBufferLine (1+y) buffer 
+        let bottomcontent = $"{x.Index + x.ScrollY + 1} of {x.FilteredContent.Length}"
+        let filtertext = Graphics.boxBottom longest.Length bottomcontent
+        x.WriteBufferLine (x.FilteredContent.Length+1) buffer filtertext
+        
     member x.LongestCompleteText() : string =
         x.CompleteTexts() |> Array.maxBy (fun (f:string) -> f.Length)
     member x.CompleteTexts() : string[] =
@@ -205,12 +172,10 @@ type ConfCmdlet() =
         |> Seq.toArray
         |> (fun f -> x.FilteredContent <- f)
 
-
-        
     member x.ClearScreen(buffer:BufferCell[,]) =
         x.Host.UI.RawUI.BackgroundColor <- -1 |> enum<ConsoleColor>
         buffer 
-        |> Array2D.iteri (fun x y f -> buffer[x,y].Character <- ' ')
+        |> Array2D.iteri (fun x y _ -> buffer[x,y].Character <- ' ')
         x.Host.UI.RawUI.SetBufferContents(x.FrameTop,buffer)
 
     override this.BeginProcessing() = this.WriteVerbose "Begin!"
@@ -245,7 +210,7 @@ type ConfCmdlet() =
 
             let start = buf ' '
             this.FilterContent()
-            drawquery this ui start
+            this.DrawQueryBox ui start
             ui.SetBufferContents(this.FrameTop,start) // 2d array
             
             let readkeyopts = 
@@ -253,13 +218,7 @@ type ConfCmdlet() =
                 ||| ReadKeyOptions.AllowCtrlC
                 ||| ReadKeyOptions.IncludeKeyDown
 
-            // let clearBuffer() =
-            //     start 
-            //     |> Array2D.iteri (fun x y f -> start[x,y].Character <- ' ')
-            //     ui.SetBufferContents(this.FrameTop,start)
-
-            let movepos (by:int) = movePosition this ui this.FrameTop start by    
-
+            let movepos (by:int) = this.MoveAndRender ui this.FrameTop start by    
             movepos 0      
 
             
@@ -288,16 +247,16 @@ type ConfCmdlet() =
                         ResultType = this.FilteredContent[this.Index].ResultType
                     }
                     |> this.WriteObject
-                    this.ClearScreen(start) |> ignore
-                | ConsoleKey.Escape -> this.ClearScreen(start) |> ignore
-                | ConsoleKey.UpArrow -> movepos -1 |> ignore ;(*up arrow*) loop()
-                | ConsoleKey.DownArrow -> movepos +1 |> ignore;(*down arrow*) loop()
+                    this.ClearScreen(start) 
+                | ConsoleKey.Escape -> this.ClearScreen(start) 
+                | ConsoleKey.UpArrow -> movepos -1  ;(*up arrow*) loop()
+                | ConsoleKey.DownArrow -> movepos +1 ;(*down arrow*) loop()
                 | ConsoleKey.OemPeriod -> (*dot*) loop()
                 | ConsoleKey.Backspace -> 
                     this.Index <- 0
                     this.ScrollY <- 0
                     this.FilterText <- this.FilterText[..this.FilterText.Length - 2]
-                    movepos 0 |> ignore
+                    movepos 0 
                     loop()
                 | _ -> 
                 match c.Character with 
@@ -306,7 +265,7 @@ type ConfCmdlet() =
                     this.FilterText <- $"{this.FilterText}%c{c}"
                     this.Index <- 0
                     this.ScrollY <- 0
-                    movepos 0 |> ignore
+                    movepos 0 
                     loop ()
 
             loop()
