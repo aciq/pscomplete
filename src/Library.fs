@@ -5,21 +5,9 @@ open Helpers
 open System.Management.Automation.Host
 open System
 open System.Text.RegularExpressions
+open System.Linq
 
-let bufferCell char = BufferCell(
-    Character = char,
-    BufferCellType = BufferCellType.Complete
-)
-
-type ExitKey =
-    | None = 0
-    | Tab = 1
-    | Enter = 2
-    | Escape = 3
-    | Error = 4
-    // | Period = 4
-    // | Slash = 5  
-    // | Backslash = 6  
+type ExitKey = | None = 0 | Tab = 1 | Enter = 2 | Escape = 3
 
 [<CLIMutable>]
 type CompleteOutput = 
@@ -50,8 +38,8 @@ type ConfCmdlet() =
     member val Index = 0 with get,set
     member val ScrollY = 0 with get,set
     member val Buffer = Unchecked.defaultof<BufferCell [,]> with get,set
-    member val FilteredContent = [||] with get,set
-    member val VisibleContent = [||] with get,set
+    member val FilteredContent : CompletionResult[] = [||] with get,set
+    member val VisibleContent : CompletionResult[] = [||] with get,set
 
     member x.SetCursorPos (ui:PSHostRawUserInterface) yroot =
       ui.CursorPosition <- Coordinates(X=0,Y=yroot+2+x.Index)
@@ -98,7 +86,7 @@ type ConfCmdlet() =
     member x.ColorSelectedLine (ui:PSHostRawUserInterface) yroot =
         let _ : CompletionResult[] = x.FilteredContent
         ui.BackgroundColor <- ConsoleColor.Blue
-        let len = min 20 x.FilteredContent[x.Index].ListItemText.Length
+        let len = min 25 x.FilteredContent[x.Index].ListItemText.Length
         let newarr = ui.NewBufferCellArray( Size(Width=len,Height=1),bufferCell ' ')
         let txtcontent = $"{x.CompleteTexts()[x.Index]}"
         x.WriteBufferLine 0 newarr txtcontent
@@ -112,7 +100,7 @@ type ConfCmdlet() =
             if x.ScrollY > 0 then
                 x.ScrollY <- x.ScrollY - 1
                 x.FilterContent()
-        | n when n >= x.FilteredContent.Length -> 
+        | n when n >= x.VisibleContent.Length -> 
             if n + x.ScrollY < x.Content.Count then
                 x.ScrollY <- x.ScrollY + 1
                 x.FilterContent()
@@ -134,10 +122,12 @@ type ConfCmdlet() =
         x.WriteBufferLine (x.VisibleContent.Length+1) buffer filtertext
         
     member x.LongestCompleteText() : string =
-        x.CompleteTexts() |> Array.maxBy (fun (f:string) -> f.Length)
+        x.CompleteTexts()
+        |> Array.maxBy (fun (f:string) -> f.Length)
+        |> (fun f -> f.PadRight(f.Length + 3,' '))
     member x.CompleteTexts() : string[] =
         [|
-            for t in x.FilteredContent do
+            for t in x.VisibleContent do
                 let tt = 
                     t.ToolTip
                     |> (fun f -> f.Replace("[]"," array"))
@@ -157,20 +147,29 @@ type ConfCmdlet() =
     member x.FilterContent() = 
         x.Content
         |> Seq.where (fun f ->
-            try Regex.IsMatch(f.ListItemText,$"^{x.CommandString}.*{x.FilterText}",RegexOptions.IgnoreCase)
+            let regexfilter =
+                let cmd = x.CommandString.Split(" ").Last()
+                if cmd = "" then $".*{x.FilterText}" else
+                match cmd.First(), cmd.Last() with
+                | '$', _ -> $".*{x.FilterText}"
+                | _ -> $"^{cmd.TrimStart([|'-';'.';'['|])}.*{x.FilterText}"
+                
+            try Regex.IsMatch(
+                f.ListItemText,
+                regexfilter,
+                RegexOptions.IgnoreCase)
             with e-> false
         )
-        |> Seq.toArray
-        |> (fun f -> 
-            if f.Length > 0 then
-                f |> Seq.skip x.ScrollY 
-            else f 
-        )
-        |> Seq.toArray
+        |> (fun f -> if Seq.isEmpty f then [||] else Seq.toArray f)
         |> (fun f ->
             x.FilteredContent <- f
             x.VisibleContent <-
-                f |> Seq.truncate (x.FrameH - 3) |> Seq.toArray
+                if f.Length = 0 then f
+                else 
+                    f |> Seq.skip x.ScrollY
+                    |> Seq.truncate (x.FrameH - 3)
+                    // |> Seq.truncate (x.FrameH - 3)
+                    |> Seq.toArray
         )
         
 

@@ -1,6 +1,7 @@
 module aciq.pscomplete.Helpers
 
 open System
+open System.Management.Automation.Host
 
 
 module Chars =
@@ -37,3 +38,9 @@ module PsArgument =
         let startidx = argtype.IndexOf(": [")
         if startidx = -1 then "" else
         argtype.Substring(startidx + ": [".Length) |> (fun f -> f[..f.Length-2])
+        
+        
+let bufferCell char = BufferCell(
+    Character = char,
+    BufferCellType = BufferCellType.Complete
+)
