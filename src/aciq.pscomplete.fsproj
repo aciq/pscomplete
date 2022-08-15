@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Helpers.fs" />
+    <Compile Include="Library.fs" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="powershellstandard.library" Version="5.1.1" />
+  </ItemGroup>
+</Project>
