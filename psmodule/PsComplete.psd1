@@ -54,8 +54,8 @@
     # RequiredModules = @()
 
     # Assemblies that must be loaded prior to importing this module
-    RequiredAssemblies = @('FSharp.Core')
-    # ,'aciq.pscomplete'
+    # RequiredAssemblies = @()
+    # 'FSharp.Core','aciq.pscomplete'
 
     # Script files (.ps1) that are run in the caller's environment prior to importing this module.
     # ScriptsToProcess = @()
@@ -99,10 +99,10 @@
             Tags = @('TabExpansion', 'PSReadLine')
 
             # A URL to the license for this module.
-            # LicenseUri = ''
+            LicenseUri = 'https://github.com/aciq/pscomplete/blob/main/LICENSE'
 
             # A URL to the main website for this project.
-            # ProjectUri = ''
+            ProjectUri = 'https://github.com/aciq/pscomplete/'
 
             # A URL to an icon representing this module.
             # IconUri = ''
