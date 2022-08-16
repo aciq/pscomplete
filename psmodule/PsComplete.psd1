@@ -55,6 +55,7 @@
 
     # Assemblies that must be loaded prior to importing this module
     RequiredAssemblies = @('FSharp.Core')
+    # ,'aciq.pscomplete'
 
     # Script files (.ps1) that are run in the caller's environment prior to importing this module.
     # ScriptsToProcess = @()
@@ -69,7 +70,7 @@
     # NestedModules = @()
 
     # Functions to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no functions to export.
-    FunctionsToExport    = ('Invoke-PsComplete', 'Install-PsComplete')
+    FunctionsToExport    = ('Invoke-GuiPsComplete', 'Install-PsComplete', 'Invoke-PsComplete')
 
     # Cmdlets to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no cmdlets to export.
     CmdletsToExport      = '*'

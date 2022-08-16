@@ -1,4 +1,5 @@
-
+# immediately chain into the next argument if its a switch
+# or stop if input is expected
 function HandleReplacementArgChain($replacement) {
     switch ($replacement.ArgumentType) {
         "psobject" {
@@ -90,13 +91,13 @@ function Install-PsComplete() {
         [System.AppDomain]::CurrentDomain.GetAssemblies() 
         | Where-Object Location 
         | Select-Object {$_.GetName().Name};
-    if (not $loadedAssemblies -contains 'FSharp.Core')
-    {
-        Import-Module 'FSharp.Core.dll'
-    }
-#     $pscompleteIsLoaded = $loadedAssemblies -contains 'aciq.pscomplete.dll';
+   
+    Import-Module "$PSScriptRoot/FSharp.Core.dll"
+    Import-Module "$PSScriptRoot/aciq.pscomplete.dll"
 
-#     Import-Module "$PSScriptRoot/aciq.pscomplete.dll"
+    Set-PSReadLineKeyHandler -Chord 'Tab' -ScriptBlock { 
+        Invoke-GuiPsComplete 
+    }
 }
 
 # Import-Module '/home/ian/f/publicrepos/aciq.pscomplete/src/bin/Debug/net6.0/aciq.pscomplete.dll' -DisableNameChecking
