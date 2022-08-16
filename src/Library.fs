@@ -122,6 +122,7 @@ type ConfCmdlet() =
         x.WriteBufferLine (x.VisibleContent.Length+1) buffer filtertext
         
     member x.LongestCompleteText() : string =
+        if x.CompleteTexts().Length = 0 then "" else
         x.CompleteTexts()
         |> Array.maxBy (fun (f:string) -> f.Length)
         |> (fun f -> f.PadRight(f.Length + 3,' '))
