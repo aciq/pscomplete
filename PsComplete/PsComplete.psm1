@@ -63,10 +63,9 @@ function Invoke-GuiPsComplete() {
             }
             Enter {
                 [Microsoft.PowerShell.PSConsoleReadLine]::Replace($completion.ReplacementIndex, $completion.ReplacementLength, $replacement.CompletionText)
-
             }
             Escape {
-
+                [Microsoft.PowerShell.PSConsoleReadLine]::SetCursorPosition($cursorPosition);
             }
             ## if there is a single option
             None {

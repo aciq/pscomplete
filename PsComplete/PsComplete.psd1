@@ -15,7 +15,7 @@
     ModuleVersion        = '0.0.1'
 
     # Supported PSEditions
-    CompatiblePSEditions = 'Core'
+    CompatiblePSEditions = ('Desktop','Core')
 
     # ID used to uniquely identify this module
     GUID                 = 'b43130ff-5523-404a-a493-202ca9837eef'
@@ -30,10 +30,10 @@
     Copyright            = '(c) aciq. All rights reserved.'
 
     # Description of the functionality provided by this module
-    # Description = ''
+    Description = 'Experimental Cross platform PowerShell tab expansion'
 
     # Minimum version of the PowerShell engine required by this module
-    # PowerShellVersion = ''
+    PowerShellVersion = '5.1'
 
     # Name of the PowerShell host required by this module
     # PowerShellHostName = ''
