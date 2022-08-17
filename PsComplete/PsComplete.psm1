@@ -86,13 +86,17 @@ function Invoke-GuiPsComplete() {
 
 
 function Install-PsComplete() {
-    $loadedAssemblies = 
-        [System.AppDomain]::CurrentDomain.GetAssemblies() 
-        | Where-Object Location 
-        | Select-Object {$_.GetName().Name};
+    $loadedAssemblies = `
+        [System.AppDomain]::CurrentDomain.GetAssemblies() `
+        | Where-Object Location `
+        | ForEach-Object {$_.GetName().Name};
    
-    Import-Module "$PSScriptRoot/FSharp.Core.dll"
-    Import-Module "$PSScriptRoot/aciq.pscomplete.dll"
+    if (!($loadedAssemblies.Contains('FSharp.Core'))) {
+        Import-Module "$PSScriptRoot/FSharp.Core.dll"    
+    }
+    if (!($loadedAssemblies.Contains('aciq.pscomplete'))) {
+        Import-Module "$PSScriptRoot/aciq.pscomplete.dll"   
+    }
 
     Set-PSReadLineKeyHandler -Chord 'Tab' -ScriptBlock { 
         Invoke-GuiPsComplete 

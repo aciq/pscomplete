@@ -30,6 +30,7 @@ type ConfCmdlet() =
     [<Parameter>]
     member val CommandCursorPosition = 0 with get,set
     
+    member val DefaultBgColor = Unchecked.defaultof<ConsoleColor> with get,set
     member val FilterText = "" with get,set
     member val CleanBufferConfig = bool with get,set
     member val FrameH = 0 with get,set
@@ -42,13 +43,29 @@ type ConfCmdlet() =
     member val VisibleContent : CompletionResult[] = [||] with get,set
 
     member x.SetCursorPos (ui:PSHostRawUserInterface) yroot =
-      ui.CursorPosition <- Coordinates(X=0,Y=yroot+2+x.Index)
+        match Platform with 
+        | Win -> 
+            // the y coord is -1 on win for some reason
+            ui.CursorPosition <- Coordinates(X=1,Y=yroot+2+x.Index - 1) 
+        | Unix -> 
+            ui.CursorPosition <- Coordinates(X=0,Y=yroot+2+x.Index)
+        
+            
 
     member x.WriteBufferLine (y:int) (buffer:BufferCell[,]) (current:string) =
         let xmax = buffer.GetLength(1) - 1
         let current = current + "                    "
         for i = 0 to min (current.Length - 1) xmax do
             buffer[y,i].Character <- current[i]
+          
+
+    member x.WriteBufferLineBlue (y:int) (buffer:BufferCell[,]) (current:string) =
+        let xmax = buffer.GetLength(1) - 1
+        let current = current + "                    "
+        for i = 0 to min (current.Length - 1) xmax do
+            buffer[y,i].Character <- current[i]
+            buffer[y,i].ForegroundColor <- ConsoleColor.Blue
+                
 
     member x.ColorBlockInside (ui:PSHostRawUserInterface) yroot (block: BufferCell[,]) =
         let xstart = 1
@@ -56,6 +73,7 @@ type ConfCmdlet() =
         let longest = x.LongestCompleteText()
         ui.BackgroundColor <- ConsoleColor.Black
         let colorArray = block[xstart..x.VisibleContent.Length,ystart..longest.Length]
+        colorArray |> Array2D.iteri (fun x y f -> colorArray[x,y].BackgroundColor <- ConsoleColor.Black )
         for i = 0 to x.VisibleContent.Length do
             ui.SetBufferContents(Coordinates(xstart,yroot+i+ystart),colorArray[i..i,0..longest.Length+10])
         ()
@@ -64,18 +82,28 @@ type ConfCmdlet() =
         x.ClearScreen(start)
         x.FilterContent()
         x.UpdateIndex adjustY
-        match x.FilteredContent.Length with 
+        match x.VisibleContent.Length with 
         | 0 -> 
             x.DrawEmptyFilter ui start
             ui.SetBufferContents(coords,start)
         | _ -> 
+
         x.DrawQueryBox ui start
         let widest : string = x.LongestCompleteText()
         let innerBox : BufferCell[,] = start[0..widest.Length,*]
-        ui.SetBufferContents(coords,innerBox)
-        x.ColorBlockInside ui coords.Y innerBox
+        let seltext = x.VisibleContent[x.Index].ListItemText
         x.SetCursorPos ui coords.Y 
-        x.ColorSelectedLine ui coords.Y 
+        match Environment.OSVersion.Platform with 
+        | PlatformID.Win32NT -> 
+            // color selected cells
+            for i = 1 to seltext.Length do
+                innerBox[x.Index + 1, i].BackgroundColor <- ConsoleColor.DarkBlue
+            ui.SetBufferContents(coords,innerBox)
+        | _ -> 
+            ui.SetBufferContents(coords,innerBox)
+            x.ColorSelectedLine ui coords.Y 
+        
+        
 
         
     member x.DrawEmptyFilter (_:PSHostRawUserInterface) (buffer:BufferCell[,])  = 
@@ -84,15 +112,42 @@ type ConfCmdlet() =
 
 
     member x.ColorSelectedLine (ui:PSHostRawUserInterface) yroot =
-        let _ : CompletionResult[] = x.FilteredContent
-        ui.BackgroundColor <- ConsoleColor.Blue
-        let len = min 25 x.FilteredContent[x.Index].ListItemText.Length
-        let newarr = ui.NewBufferCellArray( Size(Width=len,Height=1),bufferCell ' ')
-        let txtcontent = $"{x.CompleteTexts()[x.Index]}"
-        x.WriteBufferLine 0 newarr txtcontent
-        ui.SetBufferContents(Coordinates(1,yroot+1+x.Index),newarr)
-        ui.BackgroundColor <- ConsoleColor.Black
-        ()
+        // match Environment.OSVersion.Platform with 
+        let ifUnix() =
+            ui.BackgroundColor <- ConsoleColor.Blue
+            let len = min 25 x.FilteredContent[x.Index].ListItemText.Length
+            let newarr = ui.NewBufferCellArray( Size(Width=len,Height=1),bufferCell ' ')
+            let txtcontent = $"{x.CompleteTexts()[x.Index]}"
+            x.WriteBufferLine 0 newarr txtcontent
+            ui.SetBufferContents(Coordinates(1,yroot+1+x.Index),newarr)
+            ui.BackgroundColor <- ConsoleColor.Black
+        let ifWin() = 
+            let len = min 25 x.FilteredContent[x.Index].ListItemText.Length
+            ui.BackgroundColor <- ConsoleColor.Blue
+            x.Host.UI.RawUI.BackgroundColor <- ConsoleColor.Blue
+            // let newarr = ui.NewBufferCellArray( Size(Width=len,Height=1),BufferCell(' ',ConsoleColor.Red,ConsoleColor.Green,BufferCellType.Complete))
+            let txtcontent = $"{x.CompleteTexts()[x.Index]}"
+            // x.WriteBufferLine 0 newarr txtcontent
+
+            // let ypos = yroot+1+x.Index
+            let ypos = yroot+x.Index + 1
+            let lefttop = Coordinates(1,ypos )
+            let bottomright = Coordinates(25,ypos )
+            let currbuffer = 
+                ui.GetBufferContents(
+                    Rectangle(lefttop,bottomright)
+                )
+
+            currbuffer
+            |> Array2D.iteri (fun x y f -> 
+                currbuffer[x,y].BackgroundColor <- ConsoleColor.Red 
+                currbuffer[x,y].ForegroundColor <- ConsoleColor.Blue
+            )
+
+            ui.SetBufferContents(lefttop,currbuffer)
+
+
+        winunix (ifWin()) (ifUnix())
 
     member x.UpdateIndex (adjust:int) = 
         match x.Index + adjust with 
@@ -108,15 +163,16 @@ type ConfCmdlet() =
 
 
     member x.DrawQueryBox (_:PSHostRawUserInterface) (buffer:BufferCell[,])  = 
-        if x.FilteredContent.Length = 0 then () else
         let comptexts = x.CompleteTexts()
         let longest : string = x.LongestCompleteText()
         let filtertext =
             Graphics.boxTop longest.Length $"{x.CommandString}[{x.FilterText}]" 
         x.WriteBufferLine 0 buffer filtertext
         for y = 0 to x.VisibleContent.Length - 1 do
-            Graphics.boxCenter longest.Length comptexts[y]
+            Graphics.boxCenter longest.Length comptexts[y] 
             |> x.WriteBufferLine (1+y) buffer 
+
+
         let bottomcontent = $"{x.Index + x.ScrollY + 1} of {x.FilteredContent.Length}"
         let filtertext = Graphics.boxBottom longest.Length bottomcontent
         x.WriteBufferLine (x.VisibleContent.Length+1) buffer filtertext
@@ -175,7 +231,8 @@ type ConfCmdlet() =
         
 
     member x.ClearScreen(buffer:BufferCell[,]) =
-        x.Host.UI.RawUI.BackgroundColor <- -1 |> enum<ConsoleColor>
+        // x.Host.UI.RawUI.BackgroundColor <- -1 |> enum<ConsoleColor>
+        x.Host.UI.RawUI.BackgroundColor <- x.DefaultBgColor
         buffer 
         |> Array2D.iteri (fun x y _ -> buffer[x,y].Character <- ' ')
         x.Host.UI.RawUI.SetBufferContents(x.FrameTop,buffer)
@@ -187,6 +244,7 @@ type ConfCmdlet() =
         this.WriteWarning("\n"+message)
     override this.ProcessRecord() =
         try 
+            this.DefaultBgColor <- this.Host.UI.RawUI.BackgroundColor
             this.FilterContent()
             if this.Content.Count = 0 then ()
             if this.Content.Count = 1 then 

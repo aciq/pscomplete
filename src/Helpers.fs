@@ -42,5 +42,22 @@ module PsArgument =
         
 let bufferCell char = BufferCell(
     Character = char,
-    BufferCellType = BufferCellType.Complete
+    BufferCellType = BufferCellType.Complete,
+    ForegroundColor = ConsoleColor.White
+    // BackgroundColor = ConsoleColor.Black
 )
+
+let winunix ifWin ifUnix = 
+    match Environment.OSVersion.Platform with 
+    | PlatformID.Win32NT -> ifWin
+    | _ -> ifUnix
+
+
+
+type PlatformKind = | Win | Unix 
+let Platform = 
+    match Environment.OSVersion.Platform with 
+    | PlatformID.Win32NT -> Win
+    | _ -> Unix
+    
+    
