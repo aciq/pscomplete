@@ -59,13 +59,6 @@ type ConfCmdlet() =
             buffer[y,i].Character <- current[i]
           
 
-    member x.WriteBufferLineBlue (y:int) (buffer:BufferCell[,]) (current:string) =
-        let xmax = buffer.GetLength(1) - 1
-        let current = current + "                    "
-        for i = 0 to min (current.Length - 1) xmax do
-            buffer[y,i].Character <- current[i]
-            buffer[y,i].ForegroundColor <- ConsoleColor.Blue
-                
 
     member x.ColorBlockInside (ui:PSHostRawUserInterface) yroot (block: BufferCell[,]) =
         let xstart = 1
@@ -91,13 +84,23 @@ type ConfCmdlet() =
         x.DrawQueryBox ui start
         let widest : string = x.LongestCompleteText()
         let innerBox : BufferCell[,] = start[0..widest.Length,*]
-        let seltext = x.VisibleContent[x.Index].ListItemText
+        // let seltext = x.VisibleContent[x.Index].ListItemText
+        let seltext = x.CompleteTexts()[x.Index]
         x.SetCursorPos ui coords.Y 
         match Environment.OSVersion.Platform with 
         | PlatformID.Win32NT -> 
+            // black does not exist in win32, black just means default color
+            // innerBox[1..x.VisibleContent.Length,1..widest.Length]
+            // |> Array2D.iteri (fun y x f -> 
+            //     innerBox[y+1,x+1].BackgroundColor 
+            //         <- ConsoleColor.Black
+            // )
             // color selected cells
             for i = 1 to seltext.Length do
-                innerBox[x.Index + 1, i].BackgroundColor <- ConsoleColor.DarkBlue
+                innerBox[x.Index + 1, i].BackgroundColor 
+                    <- ConsoleColor.Blue
+                innerBox[x.Index + 1, i].ForegroundColor 
+                    <- ConsoleColor.Black
             ui.SetBufferContents(coords,innerBox)
         | _ -> 
             ui.SetBufferContents(coords,innerBox)
@@ -276,7 +279,7 @@ type ConfCmdlet() =
                 
             let readkeyopts = 
                 ReadKeyOptions.NoEcho 
-                ||| ReadKeyOptions.AllowCtrlC
+                // ||| ReadKeyOptions.AllowCtrlC
                 ||| ReadKeyOptions.IncludeKeyDown
 
             let movepos (by:int) = this.MoveAndRender ui this.FrameTop this.Buffer by    
