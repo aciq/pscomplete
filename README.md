@@ -1,7 +1,7 @@
 # PsComplete
 cross-platform powershell autocomplete
 
-NOTE: this is a work in progress
+NOTE: this is a work in progress 
 
 - Rewritten from scratch to make it compatible with mac/linux
 
@@ -9,17 +9,15 @@ NOTE: this is a work in progress
 
 ## demo  
 
-(the tearing is from shitty linux nvidia drivers ❤)
-
-![](_resources/pscomplete.gif)
+![](_resources/pscompletewin.gif)
 
 ## installation
 
 - `Install-Module -Name PsComplete`
 - `Install-PsComplete`
-- After that Tab is bound to the expander
+- After that Tab is bound to the expander for this session
 
-optionally add Install-PsComplete to profile (`Invoke-Item $PROFILE`)
+optionally add Install-PsComplete to profile (`Invoke-Item $PROFILE`) to have it always on
 
 
 ## features
@@ -28,19 +26,23 @@ optionally add Install-PsComplete to profile (`Invoke-Item $PROFILE`)
 - Absolutely zero customization (for now)
 - Written in F# (nice)
 - Performant (handles tens of thousands of completions without breaking a sweat)
-- Press Tab again to immediately chain the next argument (useful for switches)
+- Press Tab again to immediately select the next parameter (useful for switches)
 - Press Enter to finish command
 
 ## caveats
 
-Since powershell core hasn't implemented some functions on linux/mac this introduces some caveats.
+Since powershell core hasn't implemented some functions on linux/mac and the windows version is not too similar to the linux one internally, this introduces some caveats which i will not solve.
 
 namely:
 - Only works when there is enough free space under the current command (use clear)
-- Only continuous blocks can be colored with reasonable performance
+- Only continuous blocks can be colored with reasonable performance, so i did not use many coloring effects
 
-
-<!-- GetBufferContents
-SetBufferContents -->
+<!-- 
+- the color Black does not exist in windows, it's the background color. however it does exist on linux
+- blank color (-1) only exists on linux, throws an exception on windows
+- the coordinate systems of linux pwsh and windows are different (windows coordinates are -1)
+- there is no way to access the buffer on linux, but it can be overridden with a new array which is destructive to previous screen contents
+- there is no way to fill a rectangle on linux using SetBufferContents 
+-->
 
 
