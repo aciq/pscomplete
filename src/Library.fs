@@ -115,42 +115,14 @@ type ConfCmdlet() =
 
 
     member x.ColorSelectedLine (ui:PSHostRawUserInterface) yroot =
-        // match Environment.OSVersion.Platform with 
-        let ifUnix() =
-            ui.BackgroundColor <- ConsoleColor.Blue
-            let len = min 25 x.FilteredContent[x.Index].ListItemText.Length
-            let newarr = ui.NewBufferCellArray( Size(Width=len,Height=1),bufferCell ' ')
-            let txtcontent = $"{x.CompleteTexts()[x.Index]}"
-            x.WriteBufferLine 0 newarr txtcontent
-            ui.SetBufferContents(Coordinates(1,yroot+1+x.Index),newarr)
-            ui.BackgroundColor <- ConsoleColor.Black
-        let ifWin() = 
-            let len = min 25 x.FilteredContent[x.Index].ListItemText.Length
-            ui.BackgroundColor <- ConsoleColor.Blue
-            x.Host.UI.RawUI.BackgroundColor <- ConsoleColor.Blue
-            // let newarr = ui.NewBufferCellArray( Size(Width=len,Height=1),BufferCell(' ',ConsoleColor.Red,ConsoleColor.Green,BufferCellType.Complete))
-            let txtcontent = $"{x.CompleteTexts()[x.Index]}"
-            // x.WriteBufferLine 0 newarr txtcontent
-
-            // let ypos = yroot+1+x.Index
-            let ypos = yroot+x.Index + 1
-            let lefttop = Coordinates(1,ypos )
-            let bottomright = Coordinates(25,ypos )
-            let currbuffer = 
-                ui.GetBufferContents(
-                    Rectangle(lefttop,bottomright)
-                )
-
-            currbuffer
-            |> Array2D.iteri (fun x y f -> 
-                currbuffer[x,y].BackgroundColor <- ConsoleColor.Red 
-                currbuffer[x,y].ForegroundColor <- ConsoleColor.Blue
-            )
-
-            ui.SetBufferContents(lefttop,currbuffer)
-
-
-        winunix (ifWin()) (ifUnix())
+        ui.BackgroundColor <- ConsoleColor.Blue
+        let len = min 25 x.FilteredContent[x.Index].ListItemText.Length
+        let newarr = ui.NewBufferCellArray( Size(Width=len,Height=1),bufferCell ' ')
+        let txtcontent = $"{x.CompleteTexts()[x.Index]}"
+        x.WriteBufferLine 0 newarr txtcontent
+        ui.SetBufferContents(Coordinates(1,yroot+1+x.Index),newarr)
+        ui.BackgroundColor <- ConsoleColor.Black
+       
 
     member x.UpdateIndex (adjust:int) = 
         match x.Index + adjust with 
