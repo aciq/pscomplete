@@ -184,8 +184,12 @@ type ConfCmdlet() =
                 if cmd = "" then $".*{x.FilterText}" else
                 match cmd.First(), cmd.Last() with
                 | '$', _ -> $".*{x.FilterText}"
-                | _ -> $"^{cmd.TrimStart([|'-';'.';'['|])}.*{x.FilterText}"
-                
+                // folders
+                | _, '\\' | _, '/' -> $"{x.FilterText}"
+                | _ -> 
+                    let start = cmd.TrimStart([|'-';'.';'['|]) |> Regex.Escape
+                    $"^{start}.*{x.FilterText}"
+            
             try Regex.IsMatch(
                 f.ListItemText,
                 regexfilter,

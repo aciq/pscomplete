@@ -1,6 +1,12 @@
 # immediately chain into the next argument if its a switch
 # or stop if input is expected
 function HandleReplacementArgChain($replacement) {
+
+    if ($replacement.ResultType -eq 'ProviderContainer'){
+
+    }
+    
+
     switch ($replacement.ArgumentType) {
         "psobject" {
             [Microsoft.PowerShell.PSConsoleReadLine]::Insert('.');
@@ -27,11 +33,20 @@ function HandleReplacementArgChain($replacement) {
     }
 }
 
+function writeDebug($variable) {
+    $variable | ConvertTo-Json -Depth 5 > $env:USERPROFILE/sample.json
+}
+
 function Invoke-GuiPsComplete() {
     $buffer = ''
     $cursorPosition = 0
     [Microsoft.PowerShell.PSConsoleReadLine]::GetBufferState([ref]$buffer, [ref]$cursorPosition)
     $completion = TabExpansion2 $buffer $cursorPosition 
+    
+    if ($completion.CompletionMatches.Count -eq 0) {
+        return
+    }
+
     $replacement = 
     Invoke-PsComplete `
         -Content $completion.CompletionMatches `
@@ -56,9 +71,14 @@ function Invoke-GuiPsComplete() {
                     HandleReplacementArgChain $replacement
                 }
                 elseif ($replacement.ResultType -eq 'ProviderContainer') {
-                    # folder
-                    [Microsoft.PowerShell.PSConsoleReadLine]::Insert('/');
-                    Invoke-GuiPsComplete;
+                    if ([System.Environment]::OSVersion.Platform -eq 'Unix') {
+                        [Microsoft.PowerShell.PSConsoleReadLine]::Insert('/');
+                        Invoke-GuiPsComplete;
+                    }
+                    else {
+                        [Microsoft.PowerShell.PSConsoleReadLine]::Insert('\');
+                        Invoke-GuiPsComplete;
+                    }
                 }
             }
             Enter {
@@ -75,9 +95,14 @@ function Invoke-GuiPsComplete() {
                     Invoke-GuiPsComplete;
                 }
                 elseif ($replacement.ResultType -eq 'ProviderContainer') {
-                    # folder
-                    [Microsoft.PowerShell.PSConsoleReadLine]::Insert('/');
-                    Invoke-GuiPsComplete;
+                    if ([System.Environment]::OSVersion.Platform -eq 'Unix') {
+                        [Microsoft.PowerShell.PSConsoleReadLine]::Insert('/');
+                        Invoke-GuiPsComplete;
+                    }
+                    else {
+                        [Microsoft.PowerShell.PSConsoleReadLine]::Insert('\');
+                        Invoke-GuiPsComplete;
+                    }
                 }
             }
         }
