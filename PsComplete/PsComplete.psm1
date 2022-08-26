@@ -50,7 +50,7 @@ function Invoke-GuiPsComplete() {
     $replacement = 
     Invoke-PsComplete `
         -Content $completion.CompletionMatches `
-        -CommandString "$buffer" `
+        -CommandParameter "$buffer" `
         -CommandCursorPosition $cursorPosition 
 
     # debug
