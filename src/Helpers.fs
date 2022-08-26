@@ -1,8 +1,11 @@
 module aciq.pscomplete.Helpers
 
 open System
+open System.Management.Automation
 open System.Management.Automation.Host
-
+open System.Text.Json
+open System.Linq
+open System.Text.RegularExpressions
 
 module Chars =
     let [<Literal>] topLeftDouble = '╔'
@@ -11,13 +14,7 @@ module Chars =
     let [<Literal>] topRightDouble = '╗'
     let [<Literal>] bottomLeftDouble = '╚'
     let [<Literal>] bottomRightDouble = '╝'
-    
-    // let hexadecimal = $"\u255d"
-    // let hexadecimal = $"\u255a"
-    // let hexadecimal = $"\u2557"
-    // let hexadecimal = $"\u2554"
-    // let hexadecimal = $"\u2551"
-    // let hexadecimal = $"\u2550"
+
     
 module Graphics =
     let boxTop length content =
@@ -44,14 +41,7 @@ let bufferCell char = BufferCell(
     Character = char,
     BufferCellType = BufferCellType.Complete,
     ForegroundColor = ConsoleColor.White
-    // BackgroundColor = ConsoleColor.Black
 )
-
-let winunix ifWin ifUnix = 
-    match Environment.OSVersion.Platform with 
-    | PlatformID.Win32NT -> ifWin
-    | _ -> ifUnix
-
 
 
 type PlatformKind = | Win | Unix 
@@ -61,3 +51,74 @@ let Platform =
     | _ -> Unix
     
     
+    
+type DisplayState =
+    {
+        CommandString : string
+        FilterText : string
+        SelectedIndex : int
+        Content : CompletionResult list
+    }
+    
+module DisplayState =
+    
+    let filteredContent (state:DisplayState) =
+        let regexfilter =
+            let cmd = state.CommandString.Split(" ").Last()
+            if cmd = "" then $".*{state.FilterText}" else
+            match cmd.First(), cmd.Last() with
+            // folders
+            | _, '\\' | _, '/' -> $"{state.FilterText}"
+            | _ -> 
+                let start = cmd.TrimStart([|'-';'.';'['|]) |> Regex.Escape
+                $"^{start}.*{state.FilterText}"
+        
+        state.Content
+        |> List.where (fun f ->
+            Regex.IsMatch(f.ListItemText,regexfilter,RegexOptions.IgnoreCase)
+        )
+    
+    let withArrowDown state =
+        let filtered = state |> filteredContent
+        match state.SelectedIndex = filtered.Length - 1 with
+        | true -> state 
+        | false -> { state with SelectedIndex = state.SelectedIndex + 1 }
+    let withArrowUp state =
+        match state.SelectedIndex with
+        | 0 -> state 
+        | n -> { state with SelectedIndex = state.SelectedIndex - 1 }
+    let withBackspace state =
+        { state with
+            SelectedIndex = 0
+            FilterText = state.FilterText[..state.FilterText.Length - 2]
+        }
+        
+    let withFilterChar c state =
+        { state with
+            SelectedIndex = 0
+            FilterText = $"{state.FilterText}%c{c}"
+        }
+    
+    
+type PsCompletion() =
+    static member toText (res:CompletionResult) =
+        let typeinfo = 
+            res.ToolTip
+            |> (fun f -> f.Replace("[]"," array"))
+            |> (fun f -> 
+                if f.StartsWith "[" then ": " + f[..f.IndexOf("]")] 
+                elif f.StartsWith "\n" then 
+                    Regex.Matches(f,"\[-").Count |> (fun f -> $": %i{f}" )
+                else ""
+            )
+        $"{res.ListItemText} {typeinfo}"
+        
+let readkeyopts = 
+    ReadKeyOptions.NoEcho 
+    ||| ReadKeyOptions.AllowCtrlC
+    ||| ReadKeyOptions.IncludeKeyDown
+    
+    
+//let saveDebugState state =
+//    state |> JsonSerializer.Serialize
+//    |> (fun f -> System.IO.File.WriteAllText(@"C:\Users\kast\dev\s.json",f))
