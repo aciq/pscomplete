@@ -85,7 +85,10 @@ type ConfCmdlet() =
         let widest : string = x.LongestCompleteText()
         let innerBox : BufferCell[,] = start[0..widest.Length,*]
         // let seltext = x.VisibleContent[x.Index].ListItemText
-        let seltext = x.CompleteTexts()[x.Index]
+        let seltext =
+            try x.CompleteTexts()[x.Index]
+            with e -> ""
+            
         x.SetCursorPos ui coords.Y 
         match Environment.OSVersion.Platform with 
         | PlatformID.Win32NT -> 
@@ -204,7 +207,6 @@ type ConfCmdlet() =
                 else 
                     f |> Seq.skip x.ScrollY
                     |> Seq.truncate (x.FrameH - 3)
-                    // |> Seq.truncate (x.FrameH - 3)
                     |> Seq.toArray
         )
         
@@ -255,7 +257,7 @@ type ConfCmdlet() =
                 
             let readkeyopts = 
                 ReadKeyOptions.NoEcho 
-                // ||| ReadKeyOptions.AllowCtrlC
+                ||| ReadKeyOptions.AllowCtrlC
                 ||| ReadKeyOptions.IncludeKeyDown
 
             let movepos (by:int) = this.MoveAndRender ui this.FrameTop this.Buffer by    
@@ -293,11 +295,15 @@ type ConfCmdlet() =
                     this.FilterText <- this.FilterText[..this.FilterText.Length - 2]
                     movepos 0 
                     loop()
-                | _ -> 
+                | keycode ->
+                match int keycode with
+                // shift ctrl alt
+                | 16 | 17 | 18 -> ()
+                | _ ->  
                 match c.Character with 
-                | c -> 
-                    // clearBuffer()
+                | c ->
                     this.FilterText <- $"{this.FilterText}%c{c}"
+//                    this.FilterText <- $"{this.FilterText}{keycode}"
                     this.Index <- 0
                     this.ScrollY <- 0
                     movepos 0 
