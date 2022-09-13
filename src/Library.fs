@@ -8,6 +8,7 @@ open System
 open System.Text.RegularExpressions
 open System.Linq
 open aciq.pscomplete.Helpers
+open System.Collections.Generic
 
 type ExitKey =
     | None = 0
@@ -35,8 +36,6 @@ type ConfCmdlet() =
     [<Parameter>]
     member val CommandParameter = "" with get, set
 
-    [<Parameter>]
-    member val CommandCursorPosition = 0 with get, set
     //
     member val FrameH = 0 with get, set
     member val FrameW = 0 with get, set
@@ -147,10 +146,12 @@ type ConfCmdlet() =
         x.Host.UI.RawUI.SetBufferContents(x.FrameTopLeft, buffer)
 
     override this.BeginProcessing() =
+
         let ui = this.Host.UI.RawUI
         this.FrameTopLeft <- Coordinates(0, ui.CursorPosition.Y + 1 - ui.WindowPosition.Y)
         this.FrameH <- ui.WindowSize.Height - ui.CursorPosition.Y - 1
         this.FrameW <- ui.WindowSize.Width
+        if this.ShouldExitEarly() then () else
         //
         this.Buffer <- ui.NewBufferCellArray(Size(this.FrameW, this.FrameH), bufferCell ' ')
 
@@ -180,6 +181,8 @@ type ConfCmdlet() =
     member this.GetCompletionAndExit (state: DisplayState) (exitKey: ExitKey) =
         this.ClearScreen this.Buffer
         let filtered = state |> DisplayState.filteredContent
+        if filtered.Length = 0 then () else
+    
         let completion = filtered[state.SelectedIndex]
 
         {
@@ -196,7 +199,8 @@ type ConfCmdlet() =
     override this.ProcessRecord() =
         try
             if this.ShouldExitEarly() then
-                this.ExitWithWarning("\n\nExited Early")
+                // this.ExitWithWarning("\n\nExited Early")
+                ()
             else
                 let ui = this.Host.UI.RawUI
 

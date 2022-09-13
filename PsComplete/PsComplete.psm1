@@ -51,19 +51,22 @@ function Invoke-GuiPsComplete() {
     Invoke-PsComplete `
         -Content $completion.CompletionMatches `
         -CommandParameter "$buffer" `
-        -CommandCursorPosition $cursorPosition 
+         
 
     # debug
     # @{r=$replacement; r2=$completion} | ConvertTo-Json -Depth 5 > sample.json
     # Write-Warning "`n`n$replacement.ResultType"
     
     if ($replacement) {
-        
         switch ($replacement.ExitKey) {
             Tab {
                 [Microsoft.PowerShell.PSConsoleReadLine]::Replace($completion.ReplacementIndex, $completion.ReplacementLength, $replacement.CompletionText)
-                
-                if ($replacement.ResultType -eq 'Command') {
+
+                if ($replacement.CompletionText.StartsWith("q-")) {
+                    [Microsoft.PowerShell.PSConsoleReadLine]::Insert(' ');
+                    Invoke-GuiPsComplete;
+                }
+                elseif ($replacement.ResultType -eq 'Command') {
                     [Microsoft.PowerShell.PSConsoleReadLine]::Insert(' -');
                     Invoke-GuiPsComplete;
                 }

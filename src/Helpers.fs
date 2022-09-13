@@ -126,6 +126,9 @@ module DisplayState =
 
 
 type PsCompletion() =
+
+    /// tooltips enclosed in [] are displayed 
+    /// (usually contains argument type e.g [string array])
     static member toText(res: CompletionResult) =
         let typeinfo =
             res.ToolTip
@@ -147,6 +150,6 @@ let readkeyopts =
     ||| ReadKeyOptions.IncludeKeyDown
 
 
-//let saveDebugState state =
+// let saveDebugState state =
 //    state |> JsonSerializer.Serialize
 //    |> (fun f -> System.IO.File.WriteAllText(@"C:\Users\kast\dev\s.json",f))
