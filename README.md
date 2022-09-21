@@ -1,8 +1,6 @@
 # PsComplete
 cross-platform powershell autocomplete
 
-NOTE: this is a work in progress 
-
 - Rewritten from scratch to make it compatible with mac/linux
 
 - This is the only powershell tab-expansion compatible with all platforms, as all the other ones use windows-only functions to access the buffer array.
@@ -23,9 +21,7 @@ optionally add Install-PsComplete to profile (`Invoke-Item $PROFILE`) to have it
 ## features
 
 - Search with regex (`^<start>.*<filter>`)
-- Absolutely zero customization (for now)
-- Written in F# (nice)
-- Performant (handles tens of thousands of completions without breaking a sweat)
+- Performant up to tens of thousands of completions
 - Press Tab again to immediately select the next parameter (useful for switches)
 - Press Enter to finish command
 
