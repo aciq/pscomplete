@@ -164,14 +164,6 @@ type ConfCmdlet() =
         elif this.Content.Count = 0 then
             true
         elif this.Content.Count = 1 then
-            this.WriteObject
-                {
-                    CompletionText = this.Content[0].CompletionText
-                    ArgumentType = "" // argument type was never queried
-                    ResultType = this.Content[0].ResultType
-                    ExitKey = ExitKey.None
-                }
-
             true
         else
             false
@@ -200,7 +192,14 @@ type ConfCmdlet() =
         try
             if this.ShouldExitEarly() then
                 // this.ExitWithWarning("\n\nExited Early")
-                ()
+                if this.Content.Count = 1 then
+                    this.WriteObject
+                        {
+                            CompletionText = this.Content[0].CompletionText
+                            ArgumentType = "" // argument type was never queried
+                            ResultType = this.Content[0].ResultType
+                            ExitKey = ExitKey.None
+                        }
             else
                 let ui = this.Host.UI.RawUI
 

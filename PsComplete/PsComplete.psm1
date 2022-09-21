@@ -103,8 +103,8 @@ function Invoke-GuiPsComplete() {
                         Invoke-GuiPsComplete;
                     }
                     else {
-                        [Microsoft.PowerShell.PSConsoleReadLine]::Insert('\');
-                        Invoke-GuiPsComplete;
+                        # [Microsoft.PowerShell.PSConsoleReadLine]::Insert('\');
+                        # Invoke-GuiPsComplete;
                     }
                 }
             }
