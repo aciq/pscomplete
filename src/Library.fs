@@ -9,12 +9,8 @@ open System.Text.RegularExpressions
 open System.Linq
 open aciq.pscomplete.Helpers
 open System.Collections.Generic
+open aciq.pscomplete.Render
 
-type ExitKey =
-    | None = 0
-    | Tab = 1
-    | Enter = 2
-    | Escape = 3
 
 [<CLIMutable>]
 type CompleteOutput =
@@ -42,6 +38,7 @@ type ConfCmdlet() =
     member val FrameTopLeft = Unchecked.defaultof<Coordinates> with get, set
     member val Buffer = Unchecked.defaultof<BufferCell [,]> with get, set
 
+    member val FilteredCache = [||] with get, set
 
     member x.WriteBufferLine (y: int) (buffer: BufferCell [,]) (current: string) =
         let xmax = buffer.GetLength(1) - 1
@@ -57,13 +54,45 @@ type ConfCmdlet() =
 
         x.WriteBufferLine 0 buffer top
 
-
+    
+    member this.RenderOnly(state: DisplayState) =
+        this.Host.UI.RawUI.BackgroundColor <- ConsoleColor.Blue
+        ()
+        // let currPage =
+        //     filtered
+        //     |> Seq.skip (pageIndex * pageLength)
+        //     |> Seq.truncate pageLength
+        //     |> Seq.toList
+        //
+        // let completions =
+        //     currPage |> List.map PsCompletion.toText
+        //
+        // let currSelectedText = completions[pageSelIndex]
+        //
+        // let newarr =
+        //     this.Host.UI.RawUI.NewBufferCellArray(
+        //         Size(Width = currSelectedText.Length, Height = 1),
+        //         bufferCell ' '
+        //     )
+        //
+        // let txtcontent = $"{currSelectedText}"
+        // this.WriteBufferLine 0 newarr txtcontent
+        //
+        // this.Host.UI.RawUI.SetBufferContents(
+        //     Coordinates(1, this.FrameTopLeft.Y + 1 + pageSelIndex),
+        //     newarr
+        // )
+        // this.Host.UI.RawUI.BackgroundColor <- ConsoleColor.Black
+        // ()
+    
     member x.RenderState(state: DisplayState) =
         x.ClearScreen x.Buffer
         let pageLength = x.FrameH - 2 // frames
         let filtered = state |> DisplayState.filteredContent
+        
+        x.FilteredCache <- filtered
 
-        if filtered.IsEmpty then
+        if filtered.Length = 0 then
             x.DrawEmptyFilter state x.Buffer
             x.Host.UI.RawUI.SetBufferContents(x.FrameTopLeft, x.Buffer)
         else
@@ -112,18 +141,30 @@ type ConfCmdlet() =
                 x.Host.UI.RawUI.BackgroundColor <- ConsoleColor.Blue
 
                 let newarr =
-                    x.Host.UI.RawUI.NewBufferCellArray(Size(Width = currSelectedText.Length, Height = 1), bufferCell ' ')
+                    x.Host.UI.RawUI.NewBufferCellArray(
+                        Size(Width = currSelectedText.Length, Height = 1),
+                        bufferCell ' '
+                    )
 
                 let txtcontent = $"{currSelectedText}"
                 x.WriteBufferLine 0 newarr txtcontent
-                x.Host.UI.RawUI.SetBufferContents(Coordinates(1, x.FrameTopLeft.Y + 1 + pageSelIndex), newarr)
+
+                x.Host.UI.RawUI.SetBufferContents(
+                    Coordinates(1, x.FrameTopLeft.Y + 1 + pageSelIndex),
+                    newarr
+                )
                 x.Host.UI.RawUI.BackgroundColor <- ConsoleColor.Black
             | Win ->
                 let selectedLine = x.FrameTopLeft.Y + 1 + pageSelIndex
 
                 let linebuffer =
                     x.Host.UI.RawUI.GetBufferContents(
-                        Rectangle(left = 0, top = selectedLine, right = currSelectedText.Length, bottom = selectedLine)
+                        Rectangle(
+                            left = 0,
+                            top = selectedLine,
+                            right = currSelectedText.Length,
+                            bottom = selectedLine
+                        )
                     )
 
                 for x = 1 to currSelectedText.Length do
@@ -151,15 +192,28 @@ type ConfCmdlet() =
         this.FrameTopLeft <- Coordinates(0, ui.CursorPosition.Y + 1 - ui.WindowPosition.Y)
         this.FrameH <- ui.WindowSize.Height - ui.CursorPosition.Y - 1
         this.FrameW <- ui.WindowSize.Width
-        if this.ShouldExitEarly() then () else
-        //
-        this.Buffer <- ui.NewBufferCellArray(Size(this.FrameW, this.FrameH), bufferCell ' ')
 
-    member this.ExitWithWarning(message: string) = this.WriteWarning("\n" + message)
+        if this.ShouldExitEarly() then
+            ()
+        else
+            //
+            this.Buffer <- ui.NewBufferCellArray(Size(this.FrameW, this.FrameH), bufferCell ' ')
+
+    member this.ExitWithWarning(message: string) =
+        // this.Host.UI.RawUI.ScrollBufferContents(
+        //     source = Rectangle(0,0,0,0),
+        //     clip = Rectangle(0,0,0,0),
+        //     destination = Coordinates(0,0),
+        //     fill = bufferCell ' '
+        // )
+        this.WriteWarning("\n" + message)
 
     member this.ShouldExitEarly() =
         if this.FrameH < 3 || this.FrameW < 1 then
-            this.ExitWithWarning("Window too small to draw completion list, please clear the buffer")
+            this.ExitWithWarning(
+                "Window too small to draw completion list, please clear the buffer"
+            )
+
             true
         elif this.Content.Count = 0 then
             true
@@ -173,20 +227,23 @@ type ConfCmdlet() =
     member this.GetCompletionAndExit (state: DisplayState) (exitKey: ExitKey) =
         this.ClearScreen this.Buffer
         let filtered = state |> DisplayState.filteredContent
-        if filtered.Length = 0 then () else
-    
-        let completion = filtered[state.SelectedIndex]
 
-        {
-            CompletionText = completion.CompletionText
-            ArgumentType =
-                completion
-                |> PsCompletion.toText
-                |> PsArgument.getText
-            ResultType = completion.ResultType
-            ExitKey = exitKey
-        }
-        |> this.WriteObject
+        if filtered.Length = 0 then
+            ()
+        else
+
+            let completion = filtered[state.SelectedIndex]
+
+            {
+                CompletionText = completion.CompletionText
+                ArgumentType =
+                    completion
+                    |> PsCompletion.toText
+                    |> PsArgument.getText
+                ResultType = completion.ResultType
+                ExitKey = exitKey
+            }
+            |> this.WriteObject
 
     override this.ProcessRecord() =
         try
@@ -203,40 +260,27 @@ type ConfCmdlet() =
             else
                 let ui = this.Host.UI.RawUI
 
-                let rec loop (state: DisplayState) =
-                    this.RenderState state
-                    let c = ui.ReadKey(options = readkeyopts)
-
-                    match c.VirtualKeyCode |> enum<ConsoleKey> with
-                    | ConsoleKey.Tab -> this.GetCompletionAndExit state ExitKey.Tab
-                    | ConsoleKey.Enter -> this.GetCompletionAndExit state ExitKey.Enter
-                    | ConsoleKey.Escape -> this.GetCompletionAndExit state ExitKey.Escape
-                    | ConsoleKey.LeftArrow -> loop state
-                    | ConsoleKey.RightArrow -> loop state
-                    | ConsoleKey.UpArrow -> loop (DisplayState.withArrowUp state)
-                    | ConsoleKey.DownArrow -> loop (DisplayState.withArrowDown state)
-                    // | ConsoleKey.OemPeriod -> getCompletionAndExit ExitKey.Period
-                    // | ConsoleKey.Oem2 -> getCompletionAndExit ExitKey.Slash // forward-slash
-                    // | ConsoleKey.Oem5 -> getCompletionAndExit ExitKey.Backslash // backslash
-                    | ConsoleKey.Backspace -> loop (DisplayState.withBackspace state)
-                    | keycode ->
-                        match int keycode with
-                        // shift ctrl alt
-                        | 16
-                        | 17
-                        | 18 -> ()
-                        | _ -> loop (DisplayState.withFilterChar c.Character state)
-
+                
 
                 let initState =
                     {
                         CommandString = this.CommandParameter
                         FilterText = ""
                         SelectedIndex = 0
-                        Content = this.Content |> Seq.toList
+                        Content = this.Content.ToArray() 
                     }
-
-                loop initState
+                
+                let loopArgs =
+                    {
+                        InitState = initState
+                        Ui = ui
+                        ExitCommand = this.GetCompletionAndExit }
+                
+                Render.startLoop loopArgs (fun (state,ctx) ->
+                    this.RenderState(state)
+                    // match ctx with
+                    // | Arrow -> this.RenderState(state)
+                )
 
 
         with

@@ -69,7 +69,7 @@ type DisplayState =
         CommandString: string
         FilterText: string
         SelectedIndex: int
-        Content: CompletionResult list
+        Content: CompletionResult []
     }
 
 module DisplayState =
@@ -85,6 +85,7 @@ module DisplayState =
                 // folders
                 | _, '\\'
                 | _, '/' -> $"{state.FilterText}"
+                | '$',_ | '.',_ | '\'',_ | '"',_ | '~',_ -> $".*{state.FilterText}"
                 | _ ->
                     let start =
                         cmd.TrimStart([| '-'; '.'; '[' |]) |> Regex.Escape
@@ -92,7 +93,7 @@ module DisplayState =
                     $"^{start}.*{state.FilterText}"
 
         state.Content
-        |> List.where (fun f -> Regex.IsMatch(f.ListItemText, regexfilter, RegexOptions.IgnoreCase))
+        |> Array.where (fun f -> Regex.IsMatch(f.ListItemText, regexfilter, RegexOptions.IgnoreCase))
 
     let withArrowDown state =
         let filtered = state |> filteredContent
