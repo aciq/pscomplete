@@ -1,6 +1,7 @@
 module aciq.pscomplete.Render
 
 open System
+open System.Management.Automation
 open System.Management.Automation.Host
 open System.Threading
 open System.Threading.Tasks
@@ -16,6 +17,7 @@ type ExitKey =
 type LoopContext =
     | Arrow
     | Input
+    | InputAdded
 
 let debounce fn (millis: int) =
     let last = 0
@@ -37,13 +39,14 @@ type LoopArgs =
 let startLoop (args:LoopArgs) (beforeKey:DisplayState * LoopContext ->unit) =
     let rec loop (ctx:LoopContext) (state: DisplayState) =
         beforeKey(state,ctx)
+        
         let c = args.Ui.ReadKey(options = readkeyopts)
         match c.VirtualKeyCode |> enum<ConsoleKey> with
         | ConsoleKey.Tab -> args.ExitCommand state ExitKey.Tab
         | ConsoleKey.Enter -> args.ExitCommand state ExitKey.Enter
         | ConsoleKey.Escape -> args.ExitCommand state ExitKey.Escape
-        | ConsoleKey.LeftArrow -> loop LoopContext.Arrow state
-        | ConsoleKey.RightArrow -> loop LoopContext.Arrow state
+        | ConsoleKey.LeftArrow -> loop LoopContext.Arrow (DisplayState.withArrowLeft state)
+        | ConsoleKey.RightArrow -> loop LoopContext.Arrow (DisplayState.withArrowRight state)
         | ConsoleKey.UpArrow -> loop LoopContext.Arrow (DisplayState.withArrowUp state)
         | ConsoleKey.DownArrow -> loop LoopContext.Arrow (DisplayState.withArrowDown state)
         // | ConsoleKey.OemPeriod -> getCompletionAndExit ExitKey.Period

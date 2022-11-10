@@ -1,37 +1,32 @@
 # PsComplete
-cross-platform powershell autocomplete
+cross-platform custom powershell autocomplete
 
-- Rewritten from scratch to make it compatible with mac/linux
-
-- This is the only powershell tab-expansion compatible with all platforms, as all the other ones use windows-only functions to access the buffer array.
+Rewritten from scratch to make it compatible with mac/linux
 
 ## demo  
 
-![](_resources/pscompletewin.gif)
+[pscomplete.webm](_resources/pscomplete.webm)
 
 ## installation
 
 - `Install-Module -Name PsComplete`
-- `Install-PsComplete`
+- `Import-Module -Name PsComplete`
 - After that Tab is bound to the expander for this session
 
-optionally add Install-PsComplete to profile (`Invoke-Item $PROFILE`) to have it always on
+completion can also be invoked programmatically with `Invoke-GuiPsComplete`
 
 
 ## features
 
 - Search with regex (`^<start>.*<filter>`)
 - Performant up to tens of thousands of completions
+- Auto-expands to positional parameters (ex. Get-Process (pos.0))
 - Press Tab again to immediately select the next parameter (useful for switches)
 - Press Enter to finish command
 
-## caveats
+## one caveat because of missing features in Powershell Core:
 
-Since powershell core hasn't implemented some functions on linux/mac and the windows version is not too similar to the linux one internally, this introduces some caveats which i will not solve.
-
-namely:
 - Only works when there is enough free space under the current command (use clear)
-- Only continuous blocks can be colored with reasonable performance, so i did not use many coloring effects
 
 <!-- 
 - the color Black does not exist in windows, it's the background color. however it does exist on linux

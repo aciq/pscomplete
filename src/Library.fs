@@ -38,7 +38,7 @@ type ConfCmdlet() =
     member val FrameTopLeft = Unchecked.defaultof<Coordinates> with get, set
     member val Buffer = Unchecked.defaultof<BufferCell [,]> with get, set
 
-    member val FilteredCache = [||] with get, set
+    // member val FilteredCache = [||] with get, set
 
     member x.WriteBufferLine (y: int) (buffer: BufferCell [,]) (current: string) =
         let xmax = buffer.GetLength(1) - 1
@@ -85,33 +85,35 @@ type ConfCmdlet() =
         // this.Host.UI.RawUI.BackgroundColor <- ConsoleColor.Black
         // ()
     
-    member x.RenderState(state: DisplayState) =
+    member x.UpdateState(state: DisplayState) =
         x.ClearScreen x.Buffer
-        let pageLength = x.FrameH - 2 // frames
-        let filtered = state |> DisplayState.filteredContent
+        let state' = state |> DisplayState.filterInPlace
+        state'
         
-        x.FilteredCache <- filtered
-
-        if filtered.Length = 0 then
+    member x.UpdateStateAdded(state: DisplayState) =
+        x.ClearScreen x.Buffer
+        let state' = state |> DisplayState.filterExistingInPlace
+        state'
+        
+    
+    member x.RenderCachedState(state: DisplayState) =
+        if state.FilteredCache.Count = 0 then
             x.DrawEmptyFilter state x.Buffer
             x.Host.UI.RawUI.SetBufferContents(x.FrameTopLeft, x.Buffer)
         else
-
-
+            let pageLength = x.FrameH - 2 // frames
             let pageIndex = state.SelectedIndex / pageLength
             let pageSelIndex = state.SelectedIndex % pageLength
 
-            let currPage =
-                filtered
+            let completions =
+                state.FilteredCache
                 |> Seq.skip (pageIndex * pageLength)
                 |> Seq.truncate pageLength
-                |> Seq.toList
-
-            let completions =
-                currPage |> List.map PsCompletion.toText
+                |> Seq.map PsCompletion.toText
+                |> Seq.toArray
 
             let longest: string =
-                completions |> List.maxBy (fun f -> f.Length)
+                completions |> Array.maxBy (fun f -> f.Length)
 
             let currSelectedText = completions[pageSelIndex]
 
@@ -119,7 +121,7 @@ type ConfCmdlet() =
                 Graphics.boxTop longest.Length $"{x.CommandParameter}[{state.FilterText}]"
 
             let bottomLine =
-                Graphics.boxBottom longest.Length $"{state.SelectedIndex + 1} of {filtered.Length}"
+                Graphics.boxBottom longest.Length $"{state.SelectedIndex + 1} of {state.FilteredCache.Count}"
 
             let content =
                 [|
@@ -130,7 +132,7 @@ type ConfCmdlet() =
                 |]
 
             content
-            |> Array.iteri (fun i f -> x.WriteBufferLine (i) x.Buffer f)
+            |> Array.iteri (fun i -> x.WriteBufferLine (i) x.Buffer)
 
             x.Host.UI.RawUI.SetBufferContents(x.FrameTopLeft, x.Buffer)
 
@@ -139,16 +141,13 @@ type ConfCmdlet() =
             match Platform with
             | Unix ->
                 x.Host.UI.RawUI.BackgroundColor <- ConsoleColor.Blue
-
                 let newarr =
                     x.Host.UI.RawUI.NewBufferCellArray(
                         Size(Width = currSelectedText.Length, Height = 1),
                         bufferCell ' '
                     )
-
                 let txtcontent = $"{currSelectedText}"
                 x.WriteBufferLine 0 newarr txtcontent
-
                 x.Host.UI.RawUI.SetBufferContents(
                     Coordinates(1, x.FrameTopLeft.Y + 1 + pageSelIndex),
                     newarr
@@ -196,16 +195,9 @@ type ConfCmdlet() =
         if this.ShouldExitEarly() then
             ()
         else
-            //
             this.Buffer <- ui.NewBufferCellArray(Size(this.FrameW, this.FrameH), bufferCell ' ')
 
     member this.ExitWithWarning(message: string) =
-        // this.Host.UI.RawUI.ScrollBufferContents(
-        //     source = Rectangle(0,0,0,0),
-        //     clip = Rectangle(0,0,0,0),
-        //     destination = Coordinates(0,0),
-        //     fill = bufferCell ' '
-        // )
         this.WriteWarning("\n" + message)
 
     member this.ShouldExitEarly() =
@@ -213,7 +205,6 @@ type ConfCmdlet() =
             this.ExitWithWarning(
                 "Window too small to draw completion list, please clear the buffer"
             )
-
             true
         elif this.Content.Count = 0 then
             true
@@ -223,17 +214,15 @@ type ConfCmdlet() =
             false
 
 
-
     member this.GetCompletionAndExit (state: DisplayState) (exitKey: ExitKey) =
         this.ClearScreen this.Buffer
-        let filtered = state |> DisplayState.filteredContent
+        let filtered = state |> DisplayState.filterInPlace
 
-        if filtered.Length = 0 then
+        if filtered.FilteredCache.Count = 0 then
             ()
         else
 
-            let completion = filtered[state.SelectedIndex]
-
+            let completion = filtered.FilteredCache[state.SelectedIndex]
             {
                 CompletionText = completion.CompletionText
                 ArgumentType =
@@ -248,7 +237,6 @@ type ConfCmdlet() =
     override this.ProcessRecord() =
         try
             if this.ShouldExitEarly() then
-                // this.ExitWithWarning("\n\nExited Early")
                 if this.Content.Count = 1 then
                     this.WriteObject
                         {
@@ -259,27 +247,34 @@ type ConfCmdlet() =
                         }
             else
                 let ui = this.Host.UI.RawUI
-
                 
-
                 let initState =
                     {
                         CommandString = this.CommandParameter
                         FilterText = ""
                         SelectedIndex = 0
-                        Content = this.Content.ToArray() 
+                        Content = this.Content
+                        FilteredCache = ResizeArray(this.Content)
+                        PageLength = this.FrameH - 2
                     }
                 
                 let loopArgs =
                     {
                         InitState = initState
                         Ui = ui
-                        ExitCommand = this.GetCompletionAndExit }
+                        ExitCommand = this.GetCompletionAndExit
+                    }
                 
                 Render.startLoop loopArgs (fun (state,ctx) ->
-                    this.RenderState(state)
-                    // match ctx with
-                    // | Arrow -> this.RenderState(state)
+                    match ctx with
+                    | InputAdded ->
+                        this.UpdateStateAdded(state)
+                        |> this.RenderCachedState
+                    | Input ->
+                        this.UpdateState(state)
+                        |> this.RenderCachedState
+                    | Arrow ->
+                        this.RenderCachedState(state)
                 )
 
 

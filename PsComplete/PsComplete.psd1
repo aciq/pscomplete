@@ -12,7 +12,7 @@
     RootModule           = 'PsComplete.psm1'
 
     # Version number of this module.
-    ModuleVersion        = '0.0.7'
+    ModuleVersion        = '0.0.9'
 
     # Supported PSEditions
     CompatiblePSEditions = ('Desktop','Core')
@@ -30,7 +30,7 @@
     Copyright            = '(c) aciq. All rights reserved.'
 
     # Description of the functionality provided by this module
-    Description = 'Experimental Cross platform PowerShell tab expansion'
+    Description = 'Cross-platform custom powershell autocomplete / tab expansion'
 
     # Minimum version of the PowerShell engine required by this module
     PowerShellVersion = '5.1'
