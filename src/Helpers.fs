@@ -132,9 +132,8 @@ module DisplayState =
             { state with
                 SelectedIndex = state.SelectedIndex + 1
             }
-
     let withArrowLeft state =
-        match state.SelectedIndex - state.PageLength <= 0 with
+        match state.SelectedIndex - state.PageLength < 0 with
         | true -> state
         | false ->
             { state with
