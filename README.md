@@ -5,7 +5,9 @@ Rewritten from scratch to make it compatible with mac/linux
 
 ## demo  
 
-[pscomplete.webm](_resources/pscomplete.webm)
+[pscomplete.webm](https://github.com/aciq/pscomplete/blob/main/_resources/pscomplete.webm?raw=true)
+[pscomplete.webm](https://user-images.githubusercontent.com/36763595/200974081-f4d23c73-40b0-4ac8-98fa-5c4df28b127c.webm)
+
 
 ## installation
 
