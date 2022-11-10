@@ -1,12 +1,11 @@
 # PsComplete
 cross-platform custom powershell autocomplete
 
-Rewritten from scratch to make it compatible with mac/linux
+rewritten from scratch to make it compatible with mac/linux
 
 ## demo  
 
-https://user-images.githubusercontent.com/36763595/201066021-73a4874f-e880-43f1-abaf-13c8965bc5b3.mp4
-
+https://user-images.githubusercontent.com/36763595/201194825-270d5d32-793a-4f42-bb34-56abf2389836.mp4
 
 ## installation
 
@@ -20,7 +19,7 @@ completion can also be invoked programmatically with `Invoke-GuiPsComplete`
 ## features
 
 - Search with regex (`^<start>.*<filter>`)
-- Performant up to HUNDREDS of thousands of completions
+- Performant up to HUNDREDS OF THOUSANDS of completions
 - Auto-expands to positional parameters (ex. Get-Process (pos.0))
 - Press Tab again to immediately select the next parameter (useful for switches)
 - Press Enter to finish command
