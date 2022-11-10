@@ -92,7 +92,7 @@ type ConfCmdlet() =
         
     member x.UpdateStateAdded(state: DisplayState) =
         x.ClearScreen x.Buffer
-        let state' = state |> DisplayState.filterExistingInPlace
+        let state' = state |> DisplayState.filterCacheInPlace
         state'
         
     

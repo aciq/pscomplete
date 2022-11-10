@@ -45,20 +45,20 @@ let startLoop (args:LoopArgs) (beforeKey:DisplayState * LoopContext ->unit) =
         | ConsoleKey.Tab -> args.ExitCommand state ExitKey.Tab
         | ConsoleKey.Enter -> args.ExitCommand state ExitKey.Enter
         | ConsoleKey.Escape -> args.ExitCommand state ExitKey.Escape
-        | ConsoleKey.LeftArrow -> loop LoopContext.Arrow (DisplayState.withArrowLeft state)
-        | ConsoleKey.RightArrow -> loop LoopContext.Arrow (DisplayState.withArrowRight state)
+        | ConsoleKey.LeftArrow -> loop LoopContext.Arrow (DisplayState.arrowLeftInplace state)
+        | ConsoleKey.RightArrow -> loop LoopContext.Arrow (DisplayState.arrowRightInplace state)
         | ConsoleKey.UpArrow -> loop LoopContext.Arrow (DisplayState.withArrowUp state)
-        | ConsoleKey.DownArrow -> loop LoopContext.Arrow (DisplayState.withArrowDown state)
+        | ConsoleKey.DownArrow -> loop LoopContext.Arrow (DisplayState.arrowDownInplace state)
         // | ConsoleKey.OemPeriod -> getCompletionAndExit ExitKey.Period
         // | ConsoleKey.Oem2 -> getCompletionAndExit ExitKey.Slash // forward-slash
         // | ConsoleKey.Oem5 -> getCompletionAndExit ExitKey.Backslash // backslash
-        | ConsoleKey.Backspace -> loop LoopContext.Input (DisplayState.withBackspace state)
+        | ConsoleKey.Backspace -> loop LoopContext.Input (DisplayState.backspaceInplace state)
         | keycode ->
             match int keycode with
             // shift ctrl alt
             | 16
             | 17
             | 18 -> ()
-            | _ -> loop LoopContext.Input (DisplayState.withFilterChar c.Character state)
+            | _ -> loop LoopContext.Input (DisplayState.addFilterCharInplace c.Character state)
     
     loop LoopContext.Input args.InitState
