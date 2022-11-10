@@ -47,7 +47,7 @@ let startLoop (args:LoopArgs) (beforeKey:DisplayState * LoopContext ->unit) =
         | ConsoleKey.Escape -> args.ExitCommand state ExitKey.Escape
         | ConsoleKey.LeftArrow -> loop LoopContext.Arrow (DisplayState.arrowLeftInplace state)
         | ConsoleKey.RightArrow -> loop LoopContext.Arrow (DisplayState.arrowRightInplace state)
-        | ConsoleKey.UpArrow -> loop LoopContext.Arrow (DisplayState.withArrowUp state)
+        | ConsoleKey.UpArrow -> loop LoopContext.Arrow (DisplayState.arrowUpInplace state)
         | ConsoleKey.DownArrow -> loop LoopContext.Arrow (DisplayState.arrowDownInplace state)
         // | ConsoleKey.OemPeriod -> getCompletionAndExit ExitKey.Period
         // | ConsoleKey.Oem2 -> getCompletionAndExit ExitKey.Slash // forward-slash

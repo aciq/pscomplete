@@ -20,7 +20,7 @@ completion can also be invoked programmatically with `Invoke-GuiPsComplete`
 ## features
 
 - Search with regex (`^<start>.*<filter>`)
-- Performant up to tens of thousands of completions
+- Performant up to HUNDREDS of thousands of completions
 - Auto-expands to positional parameters (ex. Get-Process (pos.0))
 - Press Tab again to immediately select the next parameter (useful for switches)
 - Press Enter to finish command

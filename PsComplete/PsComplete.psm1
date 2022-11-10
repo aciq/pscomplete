@@ -31,9 +31,9 @@ function HandleReplacementArgChain($replacement) {
     }
 }
 
-function writeDebug($variable) {
-    $variable | ConvertTo-Json -Depth 5 > $env:HOME/Desktop/sample.json
-}
+# function writeDebug($variable) {
+#     $variable | ConvertTo-Json -Depth 5 > $env:HOME/Desktop/sample.json
+# }
 
 ## Command Helpers
 function CommandGetType {
@@ -55,8 +55,6 @@ $PsCompleteSettings = @{
 }
 
 
-
-
 function HandleCompletionCommand($commandname) {
     
     $command = Get-Command $commandname
@@ -69,7 +67,7 @@ function HandleCompletionCommand($commandname) {
         ([System.Management.Automation.CommandTypes]::Cmdlet) {
             $params = $command.ParameterSets[0].Parameters
             $posParameters = GetPositionParameters($params)
-            writeDebug $posParameters.Count
+            # writeDebug $posParameters.Count
                             
             if ($posParameters.Length -gt 0) {
                 $p1 = $posParameters[0]
@@ -84,17 +82,18 @@ function HandleCompletionCommand($commandname) {
                         }
                         Default {}
                     }
-                    Invoke-GuiPsComplete
+                    ## don't expand invokes
+                    if ($command.Verb -ne 'Invoke') {
+                        Invoke-GuiPsComplete
+                    }
                 }
             }
                             
         }
         ([System.Management.Automation.CommandTypes]::Function) {
-            writeDebug "function"
         }
                         
         Default {
-            writeDebug "got defualt"
         }
     }
 }

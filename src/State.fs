@@ -35,14 +35,13 @@ type DisplayState =
         
         [<MethodImpl(MethodImplOptions.AggressiveInlining)>]
         member this.TryGoUpBy (x:int) =
-            if this.SelectedIndex - x < 0 then
+            if this.SelectedIndex - x >= 0 then
                 this.SelectedIndex <- this.SelectedIndex - x
                 
         [<MethodImpl(MethodImplOptions.AggressiveInlining)>]
         member this.TryGoDownBy (x:int) =
             if this.SelectedIndex + x < this.FilteredCache.Count then
                 this.SelectedIndex <- this.SelectedIndex + x
-        
                 
         
 module DisplayState =
@@ -75,7 +74,7 @@ module DisplayState =
         state.TryGoUpBy(state.PageLength)
         state
     [<MethodImpl(MethodImplOptions.AggressiveInlining)>]
-    let withArrowUp (state:DisplayState) =
+    let arrowUpInplace (state:DisplayState) =
         state.TryGoUpBy(1)
         state
     [<MethodImpl(MethodImplOptions.AggressiveInlining)>]
