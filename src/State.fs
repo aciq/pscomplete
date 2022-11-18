@@ -15,23 +15,23 @@ type DisplayState =
         PageLength: int
     }
     with
-        [<MethodImpl(MethodImplOptions.AggressiveInlining)>]
-        member this.RegexFilter() =
-            let cmd = this.CommandString.Split(" ").Last()
-            match cmd with
-            | "" -> $".*{this.FilterText}"
-            // folders
-            | _ when cmd.EndsWith "\\" -> $".*{this.FilterText}"
-            | _ when cmd.EndsWith "/" -> $".*{this.FilterText}" 
-            // various start symbols that break search
-            | _ when
-                let startSymbols = [|'$';'.';'\'';'"';'~'|]
-                startSymbols |> Array.exists cmd.StartsWith
-                -> $".*{this.FilterText}"
-            // in other cases search with regex
-            | _ ->
-                let start = cmd.TrimStart([| '-'; '.'; '[' |]) |> Regex.Escape
-                $"^{start}.*{this.FilterText}"
+        // [<MethodImpl(MethodImplOptions.AggressiveInlining)>]
+        // member this.RegexFilter() =
+        //     let cmd = this.CommandString.Split(" ").Last()
+        //     match cmd with
+        //     | "" -> $".*{this.FilterText}"
+        //     // folders
+        //     | _ when cmd.EndsWith "\\" -> $".*{this.FilterText}"
+        //     | _ when cmd.EndsWith "/" -> $".*{this.FilterText}" 
+        //     // various start symbols that break search
+        //     | _ when
+        //         let startSymbols = [|'$';'.';'\'';'"';'~'|]
+        //         startSymbols |> Array.exists cmd.StartsWith
+        //         -> $".*{this.FilterText}"
+        //     // in other cases search with regex
+        //     | _ ->
+        //         let start = cmd.TrimStart([| '-'; '.'; '[' |]) |> Regex.Escape
+        //         $"^{start}.*{this.FilterText}"
         
         [<MethodImpl(MethodImplOptions.AggressiveInlining)>]
         member this.TryGoUpBy (x:int) =
@@ -45,19 +45,18 @@ type DisplayState =
                 
         
 module DisplayState =
+    open System
     let filterCacheInPlace (state: DisplayState) =
-        let filter = state.RegexFilter()
         let temp = state.FilteredCache.ToArray()
         state.FilteredCache.Clear()
         temp
-        |> Seq.where (fun f -> Regex.IsMatch(f.ListItemText, filter, RegexOptions.IgnoreCase))
+        |> Seq.where (fun f -> f.ListItemText.Contains(state.FilterText,StringComparison.OrdinalIgnoreCase))
         |> state.FilteredCache.AddRange
         state
     let filterInPlace (state: DisplayState) =
-        let filter = state.RegexFilter()
         state.FilteredCache.Clear()
         state.Content
-        |> Seq.where (fun f -> Regex.IsMatch(f.ListItemText, filter, RegexOptions.IgnoreCase))
+        |> Seq.where (fun f -> f.ListItemText.Contains(state.FilterText,StringComparison.OrdinalIgnoreCase))
         |> state.FilteredCache.AddRange
         state
      

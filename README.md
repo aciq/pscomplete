@@ -14,20 +14,41 @@ https://user-images.githubusercontent.com/36763595/201066021-73a4874f-e880-43f1-
 - `Import-Module -Name PsComplete`
 - After that Tab is bound to the expander for this session
 
-completion can also be invoked programmatically with `Invoke-GuiPsComplete`
+Additionally:
+- Add `Import-Module -Name PsComplete` to your profile via `Invoke-Item $PROFILE` to have it permanently on
+- completion can also be invoked programmatically with `Invoke-GuiPsComplete`
 
 
 ## features
 
-- Search with regex (`^<start>.*<filter>`)
+<!-- - Search with regex (`^<start>.*<filter>`) --> 
 - Performant up to HUNDREDS of thousands of completions
-- Auto-expands to positional parameters (ex. Get-Process (pos.0))
 - Press Tab again to immediately select the next parameter (useful for switches)
 - Press Enter to finish command
+- Optionally auto-expands to command parameters (ex. Get-Process (pos.0)) , see config
+
+
+## configuration 
+
+PsComplete also has some settings you can override in your profile
+
+#### ForceClearBeforeUse - clears the buffer if not enough space - may erase some preceding buffer space
+```
+$PsCompleteSettings.ForceClearBeforeUse = $true;
+```
+#### AutoExpandCommands - immediately presses tab again after finishing one of these commands
+```
+$PsCompleteSettings.AutoExpandCommands = @(
+    "Get-Process"
+    "Get-Culture"
+)
+```
 
 ## one caveat because of missing features in Powershell Core:
 
 - Only works when there is enough free space under the current command (use clear)
+- UPDATE: if you're tired of `Window too small to draw completion list, please clear the buffer` messages it is now possible to force clear screen via ANSI in configuration 
+
 
 <!-- 
 - the color Black does not exist in windows, it's the background color. however it does exist on linux

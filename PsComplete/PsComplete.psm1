@@ -2,7 +2,6 @@
 # or stop if input is expected
 using namespace System.Management.Automation
 function HandleReplacementArgChain($replacement) {
-
     if ($replacement.ResultType -eq 'ProviderContainer') {
     }
     switch ($replacement.ArgumentType) {
@@ -27,6 +26,8 @@ function HandleReplacementArgChain($replacement) {
         }
         Default {
             [Microsoft.PowerShell.PSConsoleReadLine]::Insert(' ');
+            # [Microsoft.PowerShell.PSConsoleReadLine]::Insert(' ')
+            
         }
     }
 }
@@ -50,9 +51,15 @@ function GetPositionParameters {
     | Sort-Object -Property Position
 }
 
-$PsCompleteSettings = @{
-    ExpandPositionParameters = $true
-}
+# $PsCompleteSettings = 
+#     Get-Variable -Name PsCompleteSettings -ErrorVariable $ErrorSettingsFound
+    
+# global:
+New-Variable -Scope Global -Name PsCompleteSettings -Value ([PSCustomObject]@{
+	AutoExpandCommands = @("")
+    ExpandByArgumentType = $false
+    ForceClearBeforeUse = $false
+})
 
 
 function HandleCompletionCommand($commandname) {
@@ -62,18 +69,21 @@ function HandleCompletionCommand($commandname) {
                     
     switch ($commandType) {
         ([System.Management.Automation.CommandTypes]::Application) { 
-            ## e.g. apt, cmd, /bin/sh
+            ## e.g. apt, cmd, /bin/sh - insert space after
+            [Microsoft.PowerShell.PSConsoleReadLine]::Insert(' ')
+            $cmdlen = "$replacement.CompletionText".Length + 1
+            [Microsoft.PowerShell.PSConsoleReadLine]::SetCursorPosition($cmdlen)
         }
         ([System.Management.Automation.CommandTypes]::Cmdlet) {
             $params = $command.ParameterSets[0].Parameters
             $posParameters = GetPositionParameters($params)
             # writeDebug $posParameters.Count
-                            
+            [Microsoft.PowerShell.PSConsoleReadLine]::Insert(' ')                
             if ($posParameters.Length -gt 0) {
                 $p1 = $posParameters[0]
                 [System.Type] $p1Type = $p1.ParameterType
-                [Microsoft.PowerShell.PSConsoleReadLine]::Insert(' ')
-                if ($PsCompleteSettings.ExpandPositionParameters) {
+                
+                if ($PsCompleteSettings.ExpandByArgumentType) {
                     switch ($p1Type.FullName) {
                                         ("System.String[]") { 
                             [Microsoft.PowerShell.PSConsoleReadLine]::Insert("''")
@@ -82,20 +92,26 @@ function HandleCompletionCommand($commandname) {
                         }
                         Default {}
                     }
-                    ## don't expand invokes
-                    if ($command.Verb -ne 'Invoke') {
-                        Invoke-GuiPsComplete
-                    }
+                }
+                if ($PsCompleteSettings.AutoExpandCommands.Contains($command.Name)) {
+                    Invoke-GuiPsComplete
                 }
             }
                             
         }
         ([System.Management.Automation.CommandTypes]::Function) {
+            [Microsoft.PowerShell.PSConsoleReadLine]::Insert(' ')
         }
                         
         Default {
+            [Microsoft.PowerShell.PSConsoleReadLine]::Insert(' ')
         }
     }
+}
+
+function AnsiClearScreen() {
+    Write-Host -NoNewline "`e[2J"
+    Write-Host -NoNewline "`e[H"
 }
 
 function Invoke-GuiPsComplete() {
@@ -109,6 +125,15 @@ function Invoke-GuiPsComplete() {
         return
     }
 
+    $useAnsiWorkaround = $false
+    ## create space for completions via ansi escape sequence
+    # $posx = $Host.UI.RawUI.CursorPosition.X - 1
+    $frameh = $Host.UI.RawUI.WindowSize.Height - $Host.UI.RawUI.CursorPosition.Y - 1
+    if ($frameh -lt 3 -and $PsCompleteSettings.ForceClearBeforeUse) {
+        AnsiClearScreen;
+        $useAnsiWorkaround = $true;
+    }
+    
     $replacement = 
     Invoke-PsComplete `
         -Content $completion.CompletionMatches `
@@ -120,6 +145,14 @@ function Invoke-GuiPsComplete() {
     # Write-Warning "`n`n$replacement.ResultType"
     
     if ($replacement) {
+        if ($useAnsiWorkaround ) {
+            Write-Host -NoNewline "`e[2J" # cursor scroll up 5 lines
+            Write-Host -NoNewline "`e[H" # cursor scroll up 5 lines
+            # Write-Host -NoNewline "`eM`eM`eM`eM`eM" # cursor scroll up 5 lines
+            # Write-Host -NoNewline "`eM`eM`eM`eM`eM" # cursor scroll up 5 lines
+            # Write-Host -NoNewline "`eM`eM`eM`eM`eM" # cursor scroll up 5 lines
+        }
+
         switch ($replacement.ExitKey) {
             Tab {
                 [Microsoft.PowerShell.PSConsoleReadLine]::Replace($completion.ReplacementIndex, $completion.ReplacementLength, $replacement.CompletionText)
@@ -138,8 +171,14 @@ function Invoke-GuiPsComplete() {
                         [Microsoft.PowerShell.PSConsoleReadLine]::Insert('\');
                     }
                 }
+                else {
+                    ## e.g. apt install[SPACE]
+                    [Microsoft.PowerShell.PSConsoleReadLine]::Insert(' ');
+                }
+                
             }
             Enter {
+                
                 [Microsoft.PowerShell.PSConsoleReadLine]::Replace($completion.ReplacementIndex, $completion.ReplacementLength, $replacement.CompletionText)
             }
             Escape {
@@ -179,7 +218,7 @@ function Install-PsComplete() {
     }
 
     Set-PSReadLineKeyHandler -Chord 'Tab' -ScriptBlock { 
-        Invoke-GuiPsComplete 
+        Invoke-GuiPsComplete;
     }
 }
 
